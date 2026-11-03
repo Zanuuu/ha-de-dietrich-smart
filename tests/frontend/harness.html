@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banc du panneau Chaudière</title>
+<style>
+  /* Palette par défaut de Home Assistant, claire et sombre (?theme=dark). */
+  :root { --primary-color: #03a9f4; --primary-background-color: #fafafa; --card-background-color: #fff;
+    --primary-text-color: #212121; --secondary-text-color: #727272; --divider-color: rgba(0,0,0,.12);
+    --app-header-background-color: #03a9f4; --app-header-text-color: #fff; --error-color: #db4437;
+    --warning-color: #ffa600; --success-color: #43a047; --text-primary-color: #fff; }
+  :root.dark { --primary-background-color: #111111; --card-background-color: #1c1c1c; --primary-text-color: #e1e1e1;
+    --secondary-text-color: #9b9b9b; --divider-color: rgba(225,225,225,.12); --app-header-background-color: #101e24;
+    --app-header-text-color: #e1e1e1; }
+  body { margin: 0; background: var(--primary-background-color); }
+</style>
+</head>
+<body>
+<script type="module">
+  // Faux objet hass : callWS répond avec des données proches de l'installation réelle.
+  const q = new URLSearchParams(location.search);
+  if (q.get('theme') === 'dark') document.documentElement.classList.add('dark');
+  const week = (rows) => rows.flatMap(([days, t, a]) => days.map((day) => ({ day, time: t, activity: a, setpoint: null })));
+  const WD = [1, 2, 3, 4, 5], WE = [0, 6];
+  const p2 = week([[WD, '06:00', 4], [WD, '08:30', 3], [WD, '17:00', 5], [WD, '22:00', 1], [WE, '08:00', 2], [WE, '22:30', 1]]);
+  const p1 = week([[[...WD, ...WE], '06:30', 2], [[...WD, ...WE], '22:00', 1]]);
+  const dhwWeek = [...WD, ...WE].flatMap((day) => [{ day, time: '06:00', comfort: true }, { day, time: '22:00', comfort: false }]);
+  const activities = [[1, 'Nuit', 18], [2, 'Maison', 19], [3, 'Absent', 16], [4, 'Matin', 19], [5, 'Soir', 19]]
+    .map(([n, name, setpoint]) => ({ n, name, setpoint, min: 5, max: 30, step: 0.5 }));
+  const now = Date.now() / 1000;
+  const overview = { entries: [{ entry_id: 'e1', title: 'EMC-S 24/28 MI', undo: { command_id: 12, undo_until: now + 90, action: 'activite' },
+    state: { appliances: [{ id: 'a1', name: 'EMC-S 24/28 MI',
+      zones: [{ id: 'z1', name: 'Séjour', program: 2, programs: [1, 2, 3], mode: 'schedule', setpoint: 19, room_temp: 19.5,
+        week: { 1: p1, 2: p2, 3: [] }, activities }],
+      dhw: [{ id: 'h1', name: 'Eau chaude', mode: 'eco', comfort_setpoint: 50, reduced_setpoint: 15, week: dhwWeek }] }] } }] };
+  const ev = (m, kind, level, ago, origin) => ({ id: Math.round(ago), ts: now - ago, kind, level, message: m, data: origin ? { origin } : {} });
+  const journal = {
+    events: [ev('Consigne : 19 °C → 19,5 °C', 'consigne', 'info', 300, 'Home Assistant'),
+      ev('Température ambiante de nouveau transmise : 20 °C', 'connexion', 'good', 3600),
+      ev('Température ambiante plus transmise par le cloud', 'connexion', 'warning', 7200),
+      ev('Programme 2 modifié : lundi, mardi, mercredi, jeudi, vendredi', 'programme', 'info', 86400, 'thermostat ou appli De Dietrich'),
+      ev('Pression basse : 0,9 bar', 'pression', 'warning', 172800)],
+    commands: [{ id: 12, ts: now - 30, action: 'activite', params: { activity: 1, setpoint: 17.5, name: 'Nuit' }, ok: true, origin: 'Home Assistant', undone: false },
+      { id: 11, ts: now - 4000, action: 'consigne', params: { setpoint: 19.5, duration: 'next' }, ok: true, origin: 'Home Assistant', undone: false },
+      { id: 10, ts: now - 9000, action: 'programme', params: { program: 3 }, ok: false, error: 'HTTP 500', origin: 'Home Assistant', undone: false }] };
+  window.hass = {
+    config: { time_zone: 'Europe/Paris' },
+    callWS: async (msg) => {
+      if (msg.type.endsWith('/overview')) return overview;
+      if (msg.type.endsWith('/journal')) return journal;
+      return { command_id: 13, message: 'Programme 2 modifié : lundi', undo_until: now + 120 };
+    },
+  };
+  await import('../../custom_components/de_dietrich_smart/frontend/dd-smart-panel.js');
+  const panel = document.createElement('dd-smart-panel');
+  panel.narrow = innerWidth < 870;
+  panel.hass = window.hass;
+  document.body.append(panel);
+</script>
+</body>
+</html>
