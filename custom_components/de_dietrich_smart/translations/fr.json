@@ -1,0 +1,84 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connexion au cloud De Dietrich",
+        "description": "Utilisez l'adresse e-mail et le mot de passe de l'appli De Dietrich (SMART TC°). Un seul client doit interroger le cloud : arrêtez tout autre outil qui utilise le même compte.",
+        "data": {
+          "username": "E-mail",
+          "password": "Mot de passe"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Nouvelle connexion",
+        "description": "Le cloud De Dietrich a refusé le mot de passe de {username}.",
+        "data": {
+          "password": "Mot de passe"
+        }
+      },
+      "reconfigure": {
+        "title": "Changer de compte De Dietrich",
+        "data": {
+          "username": "E-mail",
+          "password": "Mot de passe"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "E-mail ou mot de passe refusé par le cloud De Dietrich.",
+      "cannot_connect": "Le cloud De Dietrich est injoignable. Réessayez plus tard.",
+      "unknown": "Erreur inattendue, voir le journal.",
+      "no_appliance": "Aucune chaudière n'est liée à ce compte."
+    },
+    "abort": {
+      "already_configured": "Cette chaudière est déjà configurée.",
+      "reauth_successful": "Connexion rétablie.",
+      "reconfigure_successful": "Compte mis à jour.",
+      "unique_id_mismatch": "Ce compte donne accès à une autre chaudière."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "default_duration": "Durée d'un changement de consigne",
+          "emitter": "Émetteurs de chaleur",
+          "connection": "Raccordement du plancher",
+          "max_floor_flow": "Départ maximal admissible pour le plancher",
+          "base_temp": "Température extérieure de base",
+          "weather_entity": "Prévisions météo"
+        },
+        "data_description": {
+          "default_duration": "Appliquée quand la température est changée depuis Home Assistant.",
+          "connection": "Direct : la courbe de chauffe de la chaudière fixe la température de l'eau du plancher.",
+          "max_floor_flow": "Au-delà, à la température de base, une réparation signale une courbe de chauffe dangereuse pour le plancher.",
+          "base_temp": "Température extérieure la plus froide prévue pour l'installation (environ −15 °C à la ville).",
+          "weather_entity": "Utilisées par le simulateur de courbe de chauffe."
+        }
+      }
+    }
+  },
+  "selector": {
+    "duration": {
+      "options": {
+        "next": "Jusqu'au prochain créneau",
+        "1h": "1 heure",
+        "2h": "2 heures",
+        "permanent": "En permanence"
+      }
+    },
+    "emitter": {
+      "options": {
+        "floor": "Plancher chauffant",
+        "radiators": "Radiateurs"
+      }
+    },
+    "connection": {
+      "options": {
+        "direct": "Direct",
+        "mixing": "Par une vanne mélangeuse"
+      }
+    }
+  }
+}

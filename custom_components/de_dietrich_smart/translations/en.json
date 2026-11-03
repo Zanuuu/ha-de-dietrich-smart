@@ -1,0 +1,84 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to the De Dietrich cloud",
+        "description": "Use the e-mail address and password of the De Dietrich app (SMART TC°). Only one client should poll the cloud: stop any other tool that uses the same account.",
+        "data": {
+          "username": "E-mail",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Sign in again",
+        "description": "The De Dietrich cloud refused the password of {username}.",
+        "data": {
+          "password": "Password"
+        }
+      },
+      "reconfigure": {
+        "title": "Change the De Dietrich account",
+        "data": {
+          "username": "E-mail",
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "E-mail or password refused by the De Dietrich cloud.",
+      "cannot_connect": "The De Dietrich cloud cannot be reached. Try again later.",
+      "unknown": "Unexpected error, see the logs.",
+      "no_appliance": "No boiler is linked to this account."
+    },
+    "abort": {
+      "already_configured": "This boiler is already configured.",
+      "reauth_successful": "Signed in again.",
+      "reconfigure_successful": "Account updated.",
+      "unique_id_mismatch": "This account gives access to another boiler."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options",
+        "data": {
+          "default_duration": "Duration of a setpoint change",
+          "emitter": "Heat emitters",
+          "connection": "Floor heating connection",
+          "max_floor_flow": "Maximum allowed flow temperature for the floor",
+          "base_temp": "Design outdoor temperature",
+          "weather_entity": "Weather forecast"
+        },
+        "data_description": {
+          "default_duration": "Used when the temperature is changed from Home Assistant.",
+          "connection": "Direct: the boiler heating curve sets the water temperature of the floor.",
+          "max_floor_flow": "Above it, at the design outdoor temperature, a repair warns that the heating curve is unsafe for the floor.",
+          "base_temp": "Coldest outdoor temperature the installation is designed for (about -15 °C in la ville).",
+          "weather_entity": "Used by the heating curve simulator."
+        }
+      }
+    }
+  },
+  "selector": {
+    "duration": {
+      "options": {
+        "next": "Until the next switch",
+        "1h": "1 hour",
+        "2h": "2 hours",
+        "permanent": "Permanently"
+      }
+    },
+    "emitter": {
+      "options": {
+        "floor": "Floor heating",
+        "radiators": "Radiators"
+      }
+    },
+    "connection": {
+      "options": {
+        "direct": "Direct",
+        "mixing": "Through a mixing valve"
+      }
+    }
+  }
+}
