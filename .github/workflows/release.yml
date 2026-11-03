@@ -1,0 +1,24 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check the manifest version
+        run: |
+          v=$(python3 -c "import json; print(json.load(open('custom_components/de_dietrich_smart/manifest.json'))['version'])")
+          test "v$v" = "${GITHUB_REF_NAME}" || { echo "manifest $v ≠ tag ${GITHUB_REF_NAME}"; exit 1; }
+      - name: Zip the integration
+        run: cd custom_components/de_dietrich_smart && zip -r "$GITHUB_WORKSPACE/de_dietrich_smart.zip" . -x "__pycache__/*"
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: de_dietrich_smart.zip
+          generate_release_notes: true

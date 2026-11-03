@@ -1,4 +1,7 @@
 {
   "name": "De Dietrich Smart",
-  "homeassistant": "2026.10.0"
+  "homeassistant": "2026.10.0",
+  "render_readme": true,
+  "zip_release": true,
+  "filename": "de_dietrich_smart.zip"
 }
