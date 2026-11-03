@@ -59,3 +59,17 @@ def config_entry(hass):
     )
     entry.add_to_hass(hass)
     return entry
+
+
+@pytest.fixture
+async def loaded(hass, config_entry, mock_client):
+    """Entrée chargée avec le client simulé ; rend les données d'exécution."""
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    return config_entry.runtime_data
+
+
+async def push(hass, rt, new_state) -> None:
+    """Publie un nouvel état comme après une relève."""
+    rt.coordinator.async_set_updated_data(new_state)
+    await hass.async_block_till_done()

@@ -10,14 +10,16 @@ from zoneinfo import ZoneInfo
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.httpx_client import create_async_httpx_client
 
 from .bdr.cloud import BdrClient
 from .commands import CommandRunner
 from .coordinator import DeDietrichCoordinator
+from .devices import appliance_device_info
 from .journal import Journal
 
-PLATFORMS: list[Platform] = []
+PLATFORMS: list[Platform] = [Platform.CLIMATE, Platform.WATER_HEATER]
 
 
 @dataclass
@@ -26,6 +28,7 @@ class RuntimeData:
     coordinator: DeDietrichCoordinator
     journal: Journal
     commands: CommandRunner
+    device_id: str
     consumption: Any = None
 
 
@@ -50,7 +53,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -
         await client.close()
         raise
     commands = CommandRunner(hass, client, coordinator, journal)
-    entry.runtime_data = RuntimeData(client=client, coordinator=coordinator, journal=journal, commands=commands)
+    appliance = coordinator.data.appliance
+    assert appliance is not None
+    # Fiche de la chaudière enregistrée d'emblée : la zone et l'eau chaude s'y rattachent.
+    device = dr.async_get(hass).async_get_or_create(config_entry_id=entry.entry_id, **appliance_device_info(appliance))
+    entry.runtime_data = RuntimeData(
+        client=client, coordinator=coordinator, journal=journal, commands=commands, device_id=device.id
+    )
 
     @callback
     def _after_poll() -> None:

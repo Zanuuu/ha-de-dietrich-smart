@@ -6,6 +6,7 @@ line-length = 120
 select = ["E", "F", "W", "I", "UP", "B", "ASYNC", "SIM", "RUF"]
 ignore = [
     "RUF001", "RUF002", "RUF003",  # textes français : apostrophes et espaces insécables voulus
+    "RUF012",  # attributs _attr_* en listes, usage de Home Assistant
     "SIM102",  # if imbriqués gardés tels quels dans le code porté de l'application
 ]
 

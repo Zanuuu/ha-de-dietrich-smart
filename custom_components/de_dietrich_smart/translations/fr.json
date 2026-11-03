@@ -80,5 +80,47 @@
         "mixing": "Par une vanne mélangeuse"
       }
     }
+  },
+  "entity": {
+    "climate": {
+      "zone": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "schedule": "Programme",
+              "manual": "Manuel",
+              "antifrost": "Hors-gel",
+              "fireplace": "Cheminée"
+            }
+          },
+          "override_end": {
+            "name": "Fin de dérogation"
+          },
+          "next_switch": {
+            "name": "Prochain changement"
+          },
+          "next_setpoint": {
+            "name": "Prochaine consigne"
+          },
+          "program": {
+            "name": "Programme"
+          }
+        }
+      }
+    },
+    "water_heater": {
+      "dhw": {
+        "state": {
+          "schedule": "Programme",
+          "comfort": "Confort",
+          "eco": "Éco (hors-gel)"
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "command_failed": {
+      "message": "La chaudière n'a pas pris la commande : {message}"
+    }
   }
 }

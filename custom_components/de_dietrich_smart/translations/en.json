@@ -80,5 +80,47 @@
         "mixing": "Through a mixing valve"
       }
     }
+  },
+  "entity": {
+    "climate": {
+      "zone": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "schedule": "Schedule",
+              "manual": "Manual",
+              "antifrost": "Frost protection",
+              "fireplace": "Fireplace"
+            }
+          },
+          "override_end": {
+            "name": "Override end"
+          },
+          "next_switch": {
+            "name": "Next switch"
+          },
+          "next_setpoint": {
+            "name": "Next setpoint"
+          },
+          "program": {
+            "name": "Program"
+          }
+        }
+      }
+    },
+    "water_heater": {
+      "dhw": {
+        "state": {
+          "schedule": "Schedule",
+          "comfort": "Comfort",
+          "eco": "Eco (frost protection)"
+        }
+      }
+    }
+  },
+  "exceptions": {
+    "command_failed": {
+      "message": "The boiler did not accept the command: {message}"
+    }
   }
 }
