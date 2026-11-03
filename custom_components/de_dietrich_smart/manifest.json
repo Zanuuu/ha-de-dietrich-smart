@@ -1,0 +1,14 @@
+{
+  "domain": "de_dietrich_smart",
+  "name": "De Dietrich Smart",
+  "codeowners": ["@Zanuuu"],
+  "config_flow": true,
+  "dependencies": ["http", "panel_custom", "recorder", "websocket_api"],
+  "documentation": "https://github.com/Zanuuu/ha-de-dietrich-smart",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/Zanuuu/ha-de-dietrich-smart/issues",
+  "loggers": ["custom_components.de_dietrich_smart"],
+  "requirements": [],
+  "version": "0.1.0"
+}

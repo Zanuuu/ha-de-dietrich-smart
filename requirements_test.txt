@@ -1,0 +1,5 @@
+# Banc de test : pytest-homeassistant-custom-component 0.13.375 embarque homeassistant==2026.10.4.
+pytest-homeassistant-custom-component==0.13.375
+respx  # version fixée par pytest-homeassistant-custom-component
+ruff==0.17.3
+mypy==2.4.1

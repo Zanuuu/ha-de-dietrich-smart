@@ -1,0 +1,19 @@
+# Même contrôle que scripts/ci.sh, sur un runner GitLab.
+image: python:3.14-slim
+
+stages: [check]
+
+before_script:
+  - pip install --root-user-action=ignore --no-cache-dir -r requirements_test.txt
+
+lint:
+  stage: check
+  script:
+    - ruff check .
+    - ruff format --check .
+    - mypy custom_components
+
+test:
+  stage: check
+  script:
+    - python -m pytest -q -p no:cacheprovider
