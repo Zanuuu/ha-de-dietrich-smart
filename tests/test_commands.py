@@ -136,3 +136,15 @@ async def test_failed_command_is_journaled(rt, mock_client):
         await rt.commands.set_program(3)
     (c,) = rt.journal.commands(1)
     assert c["ok"] is False and c["error"] == "HTTP 500"
+
+
+async def test_pending_runs_after_next_poll(hass, rt, mock_client, state, freezer):
+    """Branchement : l'échéance est traitée quand une nouvelle relève est publiée."""
+    freezer.move_to("2026-11-04 10:00:00+00:00")
+    await rt.commands.set_setpoint(20, "1h")
+    manual = copy.deepcopy(state)
+    manual.zone.mode, manual.zone.setpoint = "manual", 20.0
+    freezer.tick(timedelta(seconds=3601))
+    rt.coordinator.async_set_updated_data(manual)
+    await hass.async_block_till_done()
+    mock_client.zone_schedule.assert_awaited_once_with("z1", 2)

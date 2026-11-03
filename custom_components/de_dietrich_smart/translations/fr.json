@@ -79,6 +79,14 @@
         "direct": "Direct",
         "mixing": "Par une vanne mélangeuse"
       }
+    },
+    "program": {
+      "options": {
+        "1": "Programme 1",
+        "2": "Programme 2",
+        "3": "Programme 3",
+        "dhw": "Eau chaude"
+      }
     }
   },
   "entity": {
@@ -232,6 +240,103 @@
   "exceptions": {
     "command_failed": {
       "message": "La chaudière n'a pas pris la commande : {message}"
+    },
+    "nothing_to_undo": {
+      "message": "Aucune commande à annuler (2 minutes au plus, dernière commande seulement)."
+    }
+  },
+  "services": {
+    "set_override": {
+      "name": "Dérogation de consigne",
+      "description": "Change la consigne d'ambiance pour une durée.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Chaudière",
+          "description": "La chaudière à piloter."
+        },
+        "temperature": {
+          "name": "Température",
+          "description": "Consigne d'ambiance."
+        },
+        "duration": {
+          "name": "Durée",
+          "description": "Par défaut, la durée choisie dans les options."
+        }
+      }
+    },
+    "set_holiday": {
+      "name": "Vacances",
+      "description": "Hors-gel par jours entiers, du départ (0 h) au jour du retour (0 h).",
+      "fields": {
+        "config_entry_id": {
+          "name": "Chaudière",
+          "description": "La chaudière à piloter."
+        },
+        "start": {
+          "name": "Départ",
+          "description": "Premier jour d'absence."
+        },
+        "end": {
+          "name": "Retour",
+          "description": "Jour du retour : les réglages habituels reprennent à 0 h."
+        }
+      }
+    },
+    "cancel_holiday": {
+      "name": "Annuler les vacances",
+      "description": "Annule la période de vacances.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Chaudière",
+          "description": "La chaudière à piloter."
+        }
+      }
+    },
+    "set_week_program": {
+      "name": "Créneaux d'un programme",
+      "description": "Remplace tous les créneaux d'un programme de chauffage (1 à 3) ou de l'eau chaude. 6 au plus par jour.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Chaudière",
+          "description": "La chaudière à piloter."
+        },
+        "program": {
+          "name": "Programme",
+          "description": "Programme de chauffage 1 à 3, ou eau chaude."
+        },
+        "switch_points": {
+          "name": "Créneaux",
+          "description": "Liste de {day: 0 = dimanche … 6, time: \"HH:MM\", activity: 1 à 5} (chauffage) ou {day, time, comfort: true/false} (eau chaude)."
+        }
+      }
+    },
+    "undo_last_command": {
+      "name": "Annuler la dernière commande",
+      "description": "Rétablit le réglage précédent, dans les 2 minutes qui suivent la dernière commande.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Chaudière",
+          "description": "La chaudière à piloter."
+        }
+      }
+    }
+  },
+  "issues": {
+    "cloud_unreachable": {
+      "title": "{name} : cloud De Dietrich injoignable",
+      "description": "Aucune relève depuis plus de 15 minutes. Dernière erreur : {error}. Home Assistant continue d'essayer."
+    },
+    "low_pressure": {
+      "title": "{name} : pression d'eau basse ({pressure} bar)",
+      "description": "Remettez le circuit de chauffage en pression, à froid, entre 1,5 et 2 bar (robinet de remplissage sous la chaudière). Si la pression rebaisse en quelques jours, faites rechercher une fuite."
+    },
+    "boiler_fault": {
+      "title": "{name} : défaut chaudière {code}",
+      "description": "{label}\n\n{advice}"
+    },
+    "unsafe_floor_curve": {
+      "title": "{name} : courbe de chauffe dangereuse pour le plancher",
+      "description": "Avec une pente de {slope} et un pied de {base} °C, le départ atteint environ {flow} °C par {base_temp} °C dehors, au-dessus des {max_floor_flow} °C admis pour un plancher alimenté en direct par la chaudière. Baissez la courbe (réglages pente et pied). Le départ maximal de la chaudière ({max_flow} °C) ne se change pas par le cloud : faites-le abaisser par votre installateur."
     }
   }
 }

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import time
 from collections import deque
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import HomeAssistant, callback
@@ -36,6 +37,9 @@ class DeDietrichCoordinator(DataUpdateCoordinator[State]):
         self.previous: State | None = None
         self.errors_in_row = 0
         self.last_error: str | None = None
+        # Début de la série d'échecs en cours (None si la dernière relève a réussi).
+        self.failing_since: float | None = None
+        self.after_poll: list[Callable[[], None]] = []
         self._expect: list[tuple[float, str, Any]] = []
         self._soon: Any = None
         # Demande de chauffe relevée à chaque relève, sur la dernière heure : (instant, en chauffe).
@@ -43,19 +47,29 @@ class DeDietrichCoordinator(DataUpdateCoordinator[State]):
 
     async def _async_update_data(self) -> State:
         try:
+            return await self._poll()
+        finally:
+            # Appelés après chaque relève, réussie ou non (les abonnés ne le sont qu'au changement).
+            for fn in self.after_poll:
+                fn()
+
+    async def _poll(self) -> State:
+        try:
             state = await self.client.fetch_state()
         except AuthError as exc:
             raise ConfigEntryAuthFailed(str(exc)) from exc
         except SourceError as exc:
             self.errors_in_row += 1
             self.last_error = str(exc)
+            if self.failing_since is None:
+                self.failing_since = time.time()
             self.update_interval = min(POLL_INTERVAL * 2**self.errors_in_row, POLL_MAX)
             if self.errors_in_row == LOST_AFTER:
                 self.journal.add_event(events.event("connexion", f"Connexion perdue : {exc}", "warning"))
             raise UpdateFailed(str(exc)) from exc
         if self.errors_in_row >= LOST_AFTER:
             self.journal.add_event(events.event("connexion", "Connexion rétablie", "good"))
-        self.errors_in_row, self.last_error = 0, None
+        self.errors_in_row, self.last_error, self.failing_since = 0, None, None
         self.update_interval = POLL_INTERVAL
         prev = self.data
         new_events = events.initial(state) if prev is None else events.diff(prev, state, self._origin)

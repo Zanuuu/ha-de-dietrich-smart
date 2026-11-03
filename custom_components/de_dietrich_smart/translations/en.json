@@ -79,6 +79,14 @@
         "direct": "Direct",
         "mixing": "Through a mixing valve"
       }
+    },
+    "program": {
+      "options": {
+        "1": "Program 1",
+        "2": "Program 2",
+        "3": "Program 3",
+        "dhw": "Hot water"
+      }
     }
   },
   "entity": {
@@ -232,6 +240,103 @@
   "exceptions": {
     "command_failed": {
       "message": "The boiler did not accept the command: {message}"
+    },
+    "nothing_to_undo": {
+      "message": "No command can be undone (2 minutes at most, last command only)."
+    }
+  },
+  "services": {
+    "set_override": {
+      "name": "Set temperature override",
+      "description": "Changes the room setpoint for a duration.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Boiler",
+          "description": "The boiler to control."
+        },
+        "temperature": {
+          "name": "Temperature",
+          "description": "Room setpoint."
+        },
+        "duration": {
+          "name": "Duration",
+          "description": "Defaults to the duration chosen in the options."
+        }
+      }
+    },
+    "set_holiday": {
+      "name": "Set holiday",
+      "description": "Frost protection for whole days, from departure (0:00) to return day (0:00).",
+      "fields": {
+        "config_entry_id": {
+          "name": "Boiler",
+          "description": "The boiler to control."
+        },
+        "start": {
+          "name": "Departure",
+          "description": "First day of absence."
+        },
+        "end": {
+          "name": "Return",
+          "description": "Day of return: normal settings resume at 0:00."
+        }
+      }
+    },
+    "cancel_holiday": {
+      "name": "Cancel holiday",
+      "description": "Cancels the holiday period.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Boiler",
+          "description": "The boiler to control."
+        }
+      }
+    },
+    "set_week_program": {
+      "name": "Set week program",
+      "description": "Replaces all switch points of a heating program (1 to 3) or of hot water. At most 6 per day.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Boiler",
+          "description": "The boiler to control."
+        },
+        "program": {
+          "name": "Program",
+          "description": "Heating program 1 to 3, or hot water."
+        },
+        "switch_points": {
+          "name": "Switch points",
+          "description": "List of {day: 0 = Sunday … 6, time: \"HH:MM\", activity: 1 to 5} (heating) or {day, time, comfort: true/false} (hot water)."
+        }
+      }
+    },
+    "undo_last_command": {
+      "name": "Undo last command",
+      "description": "Restores the previous setting, within 2 minutes of the last command.",
+      "fields": {
+        "config_entry_id": {
+          "name": "Boiler",
+          "description": "The boiler to control."
+        }
+      }
+    }
+  },
+  "issues": {
+    "cloud_unreachable": {
+      "title": "{name}: De Dietrich cloud unreachable",
+      "description": "No reading for more than 15 minutes. Last error: {error}. Home Assistant keeps retrying."
+    },
+    "low_pressure": {
+      "title": "{name}: low water pressure ({pressure} bar)",
+      "description": "Top up the heating circuit, cold, to 1.5–2 bar with the filling valve under the boiler. If the pressure drops again within days, have a leak looked for."
+    },
+    "boiler_fault": {
+      "title": "{name}: boiler fault {code}",
+      "description": "{label}\n\n{advice}"
+    },
+    "unsafe_floor_curve": {
+      "title": "{name}: heating curve unsafe for the floor heating",
+      "description": "With slope {slope} and base {base} °C, the flow reaches about {flow} °C at {base_temp} °C outside, above the {max_floor_flow} °C allowed for a floor heated directly by the boiler. Lower the curve (slope and base settings). The maximum flow temperature of the boiler ({max_flow} °C) cannot be changed from the cloud: have your installer lower it."
     }
   }
 }

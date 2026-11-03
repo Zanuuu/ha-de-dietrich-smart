@@ -1,0 +1,66 @@
+set_override:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: de_dietrich_smart
+    temperature:
+      required: true
+      selector:
+        number:
+          min: 5
+          max: 30
+          step: 0.5
+          unit_of_measurement: °C
+    duration:
+      selector:
+        select:
+          options: ["next", "1h", "2h", "permanent"]
+          translation_key: duration
+set_holiday:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: de_dietrich_smart
+    start:
+      required: true
+      selector:
+        date:
+    end:
+      required: true
+      selector:
+        date:
+cancel_holiday:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: de_dietrich_smart
+set_week_program:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: de_dietrich_smart
+    program:
+      required: true
+      selector:
+        select:
+          options: ["1", "2", "3", "dhw"]
+          translation_key: program
+    switch_points:
+      required: true
+      selector:
+        object:
+undo_last_command:
+  fields:
+    config_entry_id:
+      required: true
+      selector:
+        config_entry:
+          integration: de_dietrich_smart
