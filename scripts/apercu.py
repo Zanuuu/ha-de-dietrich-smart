@@ -20,7 +20,8 @@ OVERFLOW = """() => {
   const over = [document.documentElement, ...p.shadowRoot.querySelectorAll('*')]
     .filter((el) => el.scrollWidth > el.clientWidth + 1 && getComputedStyle(el).overflowX === 'visible'
       && !el.classList.contains('band') && el.tagName !== 'DIALOG');
-  return document.documentElement.scrollWidth > innerWidth + 1 ? ['page'] : over.map((el) => el.tagName + '.' + el.className);
+  if (document.documentElement.scrollWidth > innerWidth + 1) return ['page'];
+  return over.map((el) => el.tagName + '.' + el.className);
 }"""
 
 with sync_playwright() as pw:
