@@ -1,10 +1,13 @@
 [tool.ruff]
 target-version = "py314"
-line-length = 110
+line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "ASYNC", "SIM", "RUF"]
-ignore = ["RUF001", "RUF002", "RUF003"]  # textes français : apostrophes et espaces insécables voulus
+ignore = [
+    "RUF001", "RUF002", "RUF003",  # textes français : apostrophes et espaces insécables voulus
+    "SIM102",  # if imbriqués gardés tels quels dans le code porté de l'application
+]
 
 [tool.mypy]
 python_version = "3.14"

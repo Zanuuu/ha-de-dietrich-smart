@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Lint et tests dans un conteneur jetable sur hote-docker : le poste n'a ni pip ni Python 3.14.
-# Usage : scripts/ci.sh lint|test|all [arguments pytest]
+# Usage : scripts/ci.sh lint|test|all|fix [arguments pytest]
 # L'image de test est construite une fois par contenu de requirements_test.txt.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -25,7 +25,14 @@ case "$MODE" in
   lint) cmd="ruff check . && ruff format --check . && mypy custom_components" ;;
   test) cmd="python -m pytest -q -p no:cacheprovider $*" ;;
   all) cmd="ruff check . && ruff format --check . && mypy custom_components && python -m pytest -q -p no:cacheprovider $*" ;;
-  *) echo "usage: $0 lint|test|all" >&2; exit 2 ;;
+  fix)
+    # Corrige et formate dans le conteneur, puis rapatrie les fichiers Python modifiés.
+    git ls-files -co --exclude-standard -z | tar --null -T - -c \
+      | ssh -o BatchMode=yes "$HOST" docker run --rm -i "$TAG" sh -c \
+        "'mkdir /w && cd /w && tar x && (ruff check --fix -q . || true) >&2 && ruff format -q . >&2 && find . -name \"*.py\" -print0 | tar --null -T - -c'" \
+      | tar x
+    exit 0 ;;
+  *) echo "usage: $0 lint|test|all|fix" >&2; exit 2 ;;
 esac
 
 # Envoie l'arbre de travail (fichiers suivis et nouveaux, hors ignorés), pas seulement HEAD.

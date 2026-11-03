@@ -1,0 +1,111 @@
+{
+  "_source": "Réponse réelle du cloud BDR Thermea (EMC-S 24/28 MI + SMART TC° filaire), relevée le 02/11/2026 par /api/v1/debug/raw : identifiants, nom de maison et numéro de série masqués.",
+  "dashboard": {
+    "appliances": [
+      {
+        "applianceId": "<masqué:c3e77298>",
+        "applianceOnline": true,
+        "applianceConnectionStatus": "Connected",
+        "applianceType": "Boiler",
+        "pairingStatus": "Paired",
+        "houseName": "<masqué:3a786953>",
+        "errorStatus": "Running",
+        "activeThermalMode": "Idle",
+        "operatingMode": "AutomaticHeating",
+        "outdoorTemperatureInformation": {
+          "outdoorTemperatureSource": "None",
+          "internetOutdoorTemperature": null,
+          "applianceOutdoorTemperature": null,
+          "utilizeOutdoorTemperature": null,
+          "internetOutdoorTemperatureExpected": false,
+          "isDayTime": false,
+          "weatherCode": "Sunny",
+          "cloudOutdoorTemperature": 5,
+          "cloudOutdoorTemperatureStatus": "Ok"
+        },
+        "currentTimestamp": null,
+        "holidaySchedule": {"startTime": "0001-01-01T00:00:01Z", "endTime": "0001-01-01T00:00:01Z", "active": false},
+        "autoFillingMode": "Disabled",
+        "autoFilling": {"mode": "Disabled", "status": "Standby"},
+        "waterPressure": 1.1,
+        "waterPressureOK": true,
+        "capabilityEnergyConsumption": true,
+        "capabilityCooling": false,
+        "capabilityPreHeat": true,
+        "capabilityMultiSchedule": true,
+        "capabilityPowerSettings": false,
+        "capabilityOutdoorTemperature": true,
+        "capabilityUtilizeOutdoorTemperature": false,
+        "capabilityInternetOutdoorTemperatureExpected": true,
+        "capabilityDhwOptimization": false,
+        "hasOverwrittenActivityNames": true,
+        "gasCalorificValue": 11.0,
+        "isActive": true,
+        "timeZone": "Europe/Paris",
+        "seasonalMode": "Winter",
+        "hotWaterZones": [
+          {
+            "hotWaterZoneId": "<masqué:eeabfffb>",
+            "applianceId": "<masqué:c3e77298>",
+            "name": "DHW",
+            "zoneType": "DHW",
+            "dhwZoneMode": "Scheduling",
+            "dhwStatus": "Idle",
+            "dhwType": "Combi",
+            "nextSwitchActivity": "Reduced",
+            "capabilityBoostMode": true,
+            "dhwTemperature": null,
+            "targetSetpoint": 45.0,
+            "reducedSetpoint": 15.0,
+            "comfortSetPoint": 50.0,
+            "setPointMin": 40.0,
+            "setPointMax": 65.0,
+            "setPointRanges": {"comfortSetpointMin": 40.0, "comfortSetpointMax": 65.0, "reducedSetpointMin": 10.0, "reducedSetpointMax": 60.0},
+            "boostDuration": null,
+            "boostModeEndTime": null,
+            "nextSwitchTime": "2026-11-03T00:00:00Z",
+            "activeDwhTimeProgramNumber": 1,
+            "optimizationEnabled": false,
+            "antiLegionellaEnabled": null
+          }
+        ],
+        "climateZones": [
+          {
+            "climateZoneId": "<masqué:9db711ad>",
+            "applianceId": "<masqué:c3e77298>",
+            "name": "Séjour",
+            "zoneIcon": 0,
+            "zoneType": "CH",
+            "activeComfortDemand": "Idle",
+            "zoneMode": "Manual",
+            "controlStrategy": "Automatic",
+            "firePlaceModeActive": false,
+            "capabilityFirePlaceMode": true,
+            "roomTemperature": 20.0,
+            "setPoint": 19.5,
+            "nextSetpoint": 19.0,
+            "nextSwitchTime": "2026-11-03T06:00:00Z",
+            "setPointMin": 5.0,
+            "setPointMax": 30.0,
+            "currentScheduleSetPoint": 18.0,
+            "activeHeatingClimateTimeProgramNumber": 2,
+            "capabilityCooling": false,
+            "capabilityTemporaryOverrideEndTime": true,
+            "preHeat": {"enabled": true, "active": false},
+            "temporaryOverride": {"endTime": "0001-01-01T00:00:00Z"}
+          }
+        ],
+        "solarThermals": []
+      }
+    ]
+  },
+  "technicaldetails": {
+    "<masqué:c3e77298>": {
+      "applianceName": "Appareil",
+      "internetConnectedGateways": [
+        {"deviceTypeName": "RU2", "name": "RU2", "serialNumber": "<masqué:87e8a9d0>", "softwareVersion": "2.28.6", "hardwareVersion": "7", "controlledZoneName": null}
+      ],
+      "peripherals": []
+    }
+  }
+}

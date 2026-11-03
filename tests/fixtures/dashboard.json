@@ -1,0 +1,66 @@
+{
+  "appliances": [
+    {
+      "applianceId": "a1b2c3",
+      "applianceOnline": true,
+      "applianceConnectionStatus": "Connected",
+      "applianceType": "Boiler",
+      "houseName": "Maison Exemple",
+      "errorStatus": "Running",
+      "activeThermalMode": "Heating",
+      "operatingMode": "AutomaticHeating",
+      "currentTimestamp": "2026-11-02T20:00:00Z",
+      "waterPressure": 1.6,
+      "waterPressureOK": true,
+      "capabilityEnergyConsumption": true,
+      "outdoorTemperatureInformation": {
+        "outdoorTemperatureSource": "Internet",
+        "internetOutdoorTemperature": 6.5,
+        "applianceOutdoorTemperature": null,
+        "cloudOutdoorTemperature": 6.0
+      },
+      "holidaySchedule": {"startTime": "0001-01-01T00:00:00Z", "endTime": "0001-01-01T00:00:00Z", "active": false},
+      "hotWaterZones": [
+        {
+          "hotWaterZoneId": "h1",
+          "applianceId": "a1b2c3",
+          "name": "Eau chaude",
+          "dhwZoneMode": "Scheduling",
+          "dhwStatus": "Idle",
+          "dhwType": "Combi",
+          "dhwTemperature": 49.5,
+          "targetSetpoint": 55.0,
+          "reducedSetpoint": 45.0,
+          "comfortSetPoint": 55.0,
+          "setPointMin": 40.0,
+          "setPointMax": 65.0,
+          "setPointRanges": {"comfortSetpointMin": 40.0, "comfortSetpointMax": 65.0, "reducedSetpointMin": 10.0, "reducedSetpointMax": 60.0},
+          "nextSwitchTime": "0001-01-01T00:00:00Z"
+        }
+      ],
+      "climateZones": [
+        {
+          "climateZoneId": "z1",
+          "applianceId": "a1b2c3",
+          "name": "Salon",
+          "activeComfortDemand": "ProducingHeat",
+          "zoneMode": "TemporaryOverride",
+          "controlStrategy": "Automatic",
+          "firePlaceModeActive": false,
+          "capabilityFirePlaceMode": true,
+          "roomTemperature": 19.4,
+          "setPoint": 21.0,
+          "nextSetpoint": 17.0,
+          "nextSwitchTime": "2026-11-02T21:30:00Z",
+          "setPointMin": 5.0,
+          "setPointMax": 30.0,
+          "currentScheduleSetPoint": 20.0,
+          "activeHeatingClimateTimeProgramNumber": 2,
+          "preHeat": {"enabled": false, "active": false},
+          "temporaryOverride": {"endTime": "2026-11-02T21:30:00Z"}
+        }
+      ],
+      "solarThermals": []
+    }
+  ]
+}
