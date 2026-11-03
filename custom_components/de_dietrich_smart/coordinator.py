@@ -74,6 +74,12 @@ class DeDietrichCoordinator(DataUpdateCoordinator[State]):
                 return events.APP_ORIGIN
         return events.EXT_ORIGIN
 
+    async def async_shutdown(self) -> None:
+        if self._soon:
+            self._soon()
+            self._soon = None
+        await super().async_shutdown()
+
     @callback
     def async_refresh_soon(self) -> None:
         """Relève anticipée après une commande, le temps que le cloud la prenne en compte."""

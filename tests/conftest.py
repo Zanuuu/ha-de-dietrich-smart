@@ -34,14 +34,15 @@ def state(dashboard: dict):
 @pytest.fixture
 def mock_client(state):
     """BdrClient remplacé : fetch_state rend `state` (modifiable par le test), commandes enregistrées."""
-    from unittest.mock import AsyncMock, MagicMock, patch
+    from unittest.mock import AsyncMock, patch
 
-    client = MagicMock()
-    client.start = AsyncMock()
-    client.close = AsyncMock()
-    client.fetch_state = AsyncMock(return_value=state)
-    client.fetch_consumption_days = AsyncMock(return_value=[])
-    client.fetch_consumption_hours = AsyncMock(return_value=[])
+    from custom_components.de_dietrich_smart.bdr.cloud import BdrClient
+
+    # spec : les méthodes async du vrai client deviennent des AsyncMock.
+    client = AsyncMock(spec=BdrClient)
+    client.fetch_state.return_value = state
+    client.fetch_consumption_days.return_value = []
+    client.fetch_consumption_hours.return_value = []
     with patch("custom_components.de_dietrich_smart.BdrClient", return_value=client):
         yield client
 

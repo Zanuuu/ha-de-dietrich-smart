@@ -9,10 +9,11 @@ from zoneinfo import ZoneInfo
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.httpx_client import create_async_httpx_client
 
 from .bdr.cloud import BdrClient
+from .commands import CommandRunner
 from .coordinator import DeDietrichCoordinator
 from .journal import Journal
 
@@ -24,7 +25,7 @@ class RuntimeData:
     client: BdrClient
     coordinator: DeDietrichCoordinator
     journal: Journal
-    commands: Any = None
+    commands: CommandRunner
     consumption: Any = None
 
 
@@ -48,7 +49,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -
     except Exception:
         await client.close()
         raise
-    entry.runtime_data = RuntimeData(client=client, coordinator=coordinator, journal=journal)
+    commands = CommandRunner(hass, client, coordinator, journal)
+    entry.runtime_data = RuntimeData(client=client, coordinator=coordinator, journal=journal, commands=commands)
+
+    @callback
+    def _after_poll() -> None:
+        entry.async_create_background_task(hass, commands.async_run_pending(), "de_dietrich_smart_pending")
+
+    entry.async_on_unload(coordinator.async_add_listener(_after_poll))
     entry.async_on_unload(client.close)
     entry.async_on_unload(journal.async_save)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
