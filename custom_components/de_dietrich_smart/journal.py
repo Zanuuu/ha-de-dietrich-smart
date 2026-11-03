@@ -100,11 +100,25 @@ class Journal:
     # --- Retours au programme en attente ----------------------------------
 
     def add_pending(
-        self, due: float, action: str, params: dict[str, Any], command_id: int, expect: dict[str, Any]
+        self,
+        due: float,
+        action: str,
+        params: dict[str, Any],
+        command_id: int,
+        expect: dict[str, Any],
+        attempts: int = 0,
     ) -> int:
         pid = self._next_id()
         self._data["pendings"].append(
-            {"id": pid, "due": due, "action": action, "params": params, "command_id": command_id, "expect": expect}
+            {
+                "id": pid,
+                "due": due,
+                "action": action,
+                "params": params,
+                "command_id": command_id,
+                "expect": expect,
+                "attempts": attempts,
+            }
         )
         self._save()
         return pid

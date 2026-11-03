@@ -148,3 +148,34 @@ async def test_pending_runs_after_next_poll(hass, rt, mock_client, state, freeze
     rt.coordinator.async_set_updated_data(manual)
     await hass.async_block_till_done()
     mock_client.zone_schedule.assert_awaited_once_with("z1", 2)
+
+
+async def test_failed_setpoint_keeps_pending(rt, mock_client, freezer):
+    """Commande en échec (cloud en panne) : le retour au programme prévu n'est pas perdu."""
+    from custom_components.de_dietrich_smart.bdr.models import SourceError
+
+    freezer.move_to("2026-11-04 10:00:00+00:00")
+    await rt.commands.set_setpoint(20, "1h")
+    mock_client.zone_manual.side_effect = SourceError("HTTP 503")
+    with pytest.raises(CommandError):
+        await rt.commands.set_setpoint(21, "2h")
+    assert len(rt.journal.pendings()) == 1
+
+
+async def test_failed_return_is_retried(hass, rt, mock_client, state, freezer):
+    from custom_components.de_dietrich_smart.bdr.models import SourceError
+
+    freezer.move_to("2026-11-04 10:00:00+00:00")
+    await rt.commands.set_setpoint(20, "1h")
+    manual = copy.deepcopy(state)
+    manual.zone.mode, manual.zone.setpoint = "manual", 20.0
+    rt.coordinator.data = manual
+    mock_client.zone_schedule.side_effect = SourceError("HTTP 503")
+    freezer.tick(timedelta(seconds=3601))
+    await rt.commands.async_run_pending()
+    (p,) = rt.journal.pendings()
+    assert p["attempts"] == 1
+    freezer.tick(timedelta(seconds=301))
+    mock_client.zone_schedule.side_effect = None
+    await rt.commands.async_run_pending()
+    assert mock_client.zone_schedule.await_count == 2 and rt.journal.pendings() == []

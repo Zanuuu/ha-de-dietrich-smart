@@ -87,3 +87,17 @@ async def test_panel_registered_once_for_two_entries(hass, config_entry, mock_cl
         remove.assert_not_called()
         assert await hass.config_entries.async_unload(other.entry_id)
         remove.assert_called_once_with(hass, "de-dietrich-smart")
+
+
+async def test_panel_reregistered_after_reload(hass, config_entry, mock_client):
+    hass.config.components.add("frontend")
+    with (
+        patch("homeassistant.components.http.HomeAssistantHTTP.async_register_static_paths", AsyncMock()) as static,
+        patch("homeassistant.components.panel_custom.async_register_panel", AsyncMock()) as register,
+        patch("homeassistant.components.frontend.async_remove_panel"),
+    ):
+        assert await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+        assert await hass.config_entries.async_reload(config_entry.entry_id)
+        await hass.async_block_till_done()
+        assert register.await_count == 2 and static.await_count == 1

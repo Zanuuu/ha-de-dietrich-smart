@@ -444,6 +444,7 @@ class BdrClient:
         self._refresh_token: str | None = None
         self._expires_at = 0.0
         self._token_lock = asyncio.Lock()
+        self._auth_refused: AuthError | None = None
         self._technical: dict[str, dict[str, Any]] = {}
         self._technical_at = 0.0
         self._programs: dict[str, Any] = {}
@@ -569,9 +570,17 @@ class BdrClient:
 
     async def _token(self, force: bool = False) -> str:
         async with self._token_lock:
+            # Identifiants refusés : plus aucune tentative, le compte serait verrouillé. Un nouveau
+            # client (rechargement avec de nouveaux identifiants) repart de zéro.
+            if self._auth_refused:
+                raise self._auth_refused
             if force or not self._access_token or time.monotonic() > self._expires_at - 60:
                 if not await self._refresh():
-                    await self._login()
+                    try:
+                        await self._login()
+                    except AuthError as exc:
+                        self._auth_refused = exc
+                        raise
             assert self._access_token
             return self._access_token
 
@@ -831,6 +840,12 @@ class BdrClient:
             raise SourceError(f"activité inconnue du thermostat : {', '.join(map(str, sorted(unknown)))}")
         body = [{"activityNumber": a["n"], "temperature": setpoints.get(a["n"], a["setpoint"])} for a in current]
         await self._request("PUT", f"/climate-zones/{zone_id}/activities/heating", json=body)
+        # Écart au port : la copie lue est mise à jour tout de suite, sinon une seconde écriture
+        # avant la relève suivante renverrait l'ancienne valeur de la première.
+        sent = {b["activityNumber"]: b["temperature"] for b in body}
+        for raw in self._activities_raw.get(zone_id) or []:
+            if raw.get("activityNumber") in sent and str(raw.get("type", "Heating")).lower() == "heating":
+                raw["temperature"] = sent[raw["activityNumber"]]
         self._reread_extras()
 
     async def zone_week(self, zone_id: str, program: int, week: list[dict[str, Any]]) -> None:

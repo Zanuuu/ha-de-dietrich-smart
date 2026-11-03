@@ -21,14 +21,17 @@ def _version() -> str:
 
 async def async_register(hass: HomeAssistant) -> None:
     """Enregistre le panneau à la première entrée chargée (si l'interface est chargée)."""
-    if hass.data.get(DATA_PANEL) or "frontend" not in hass.config.components or hass.http is None:
+    registered = hass.data.get(DATA_PANEL)
+    if registered is True or "frontend" not in hass.config.components or hass.http is None:
         return
     from homeassistant.components import panel_custom
     from homeassistant.components.http import StaticPathConfig
 
     hass.data[DATA_PANEL] = True
     version = await hass.async_add_executor_job(_version)
-    await hass.http.async_register_static_paths([StaticPathConfig(STATIC_URL, str(FRONTEND_DIR), True)])
+    # Après un déchargement, les fichiers restent servis : seul le panneau est remis.
+    if registered != "static":
+        await hass.http.async_register_static_paths([StaticPathConfig(STATIC_URL, str(FRONTEND_DIR), True)])
     await panel_custom.async_register_panel(
         hass,
         frontend_url_path=URL_PATH,

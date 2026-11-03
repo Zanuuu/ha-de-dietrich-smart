@@ -5,6 +5,7 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.statistics import statistics_during_period
+from pytest_homeassistant_custom_component.common import async_fire_time_changed
 from pytest_homeassistant_custom_component.components.recorder.common import async_wait_recording_done
 
 from custom_components.de_dietrich_smart.bdr.models import DayConsumption, HourConsumption
@@ -27,9 +28,9 @@ def test_hours_override_utc_day() -> None:
     days = [DayConsumption(date(2026, 11, 1), 30.0, 5.0), DayConsumption(date(2026, 11, 2), 99.0, 9.0)]
     hours = hours_of(date(2026, 11, 2), 1.0)
     stats = build_statistics(days, hours, "heating", NOW)
-    # Le 01/11 : valeur du jour à minuit UTC ; le 02/11 : 24 heures (24 kWh, pas 99).
+    # Le 01/11 : valeur du jour à minuit UTC (24 heures écrites) ; le 02/11 : 24 heures (24 kWh, pas 99).
     assert stats[0]["start"] == datetime(2026, 11, 1, tzinfo=UTC) and stats[0]["state"] == 30.0
-    assert len(stats) == 1 + 24
+    assert len(stats) == 24 + 24
     assert stats[-1]["sum"] == 30.0 + 24.0
 
 
@@ -38,7 +39,7 @@ def test_partial_first_hour_day_keeps_daily_value() -> None:
     days = [DayConsumption(date(2026, 11, 1), 30.0, 0.0)]
     hours = [HourConsumption(datetime(2026, 11, 1, 23, tzinfo=UTC), 2.0, 0.0)]
     stats = build_statistics(days, hours, "heating", NOW)
-    assert [s["state"] for s in stats] == [30.0]
+    assert [s["state"] for s in stats] == [30.0] + [0.0] * 23
 
 
 def test_future_hours_ignored() -> None:
@@ -97,3 +98,84 @@ async def test_gas_today_sensor(hass, config_entry, mock_client, freezer) -> Non
     s = hass.states.get("sensor.maison_exemple_gas_today")
     assert s is not None and float(s.state) == 14.0
     assert s.attributes["unit_of_measurement"] == "kWh"
+
+
+def test_daily_value_rewrites_whole_day() -> None:
+    """Jour UTC passé des heures à la valeur du jour : ses 24 heures sont réécrites (sommes monotones)."""
+    day = date(2026, 11, 2)
+    days = [DayConsumption(day, 30.0, 0.0)]
+    hours = hours_of(day, 1.0, count=23)
+    stats = build_statistics(days, hours, "heating", NOW)
+    assert len(stats) == 24
+    assert stats[0]["state"] == 30.0 and all(s["state"] == 0.0 for s in stats[1:])
+    sums = [s["sum"] for s in stats]
+    assert sums == sorted(sums) and sums[-1] == 30.0
+
+
+async def test_stored_hours_survive_restart(hass, hass_storage, config_entry, mock_client, freezer) -> None:
+    freezer.move_to(NOW)
+    old = datetime(2026, 10, 10, 8, tzinfo=UTC)
+    hass_storage[f"de_dietrich_smart.{config_entry.entry_id}.consumption"] = {
+        "version": 1,
+        "minor_version": 1,
+        "key": f"de_dietrich_smart.{config_entry.entry_id}.consumption",
+        "data": {"days": {"2026-10-10": [40.0, 4.0]}, "hours": {old.isoformat(): [3.0, 0.5]}},
+    }
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    data = config_entry.runtime_data.consumption.data
+    assert [h.ts for h in data.hours] == [old]
+    assert [d.day for d in data.days] == [date(2026, 10, 10)]
+
+
+async def test_consumption_polls_without_sensor(hass, config_entry, mock_client, freezer) -> None:
+    """L'import horaire continue même si le capteur « gaz du jour » est désactivé."""
+    from homeassistant.helpers import entity_registry as er
+
+    er.async_get(hass).async_get_or_create(
+        "sensor",
+        "de_dietrich_smart",
+        "a1b2c3_gas_today",
+        config_entry=config_entry,
+        disabled_by=er.RegistryEntryDisabler.USER,
+    )
+    freezer.move_to(NOW)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    calls = mock_client.fetch_consumption_days.await_count
+    freezer.tick(timedelta(hours=1, minutes=1))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert mock_client.fetch_consumption_days.await_count == calls + 1
+
+
+async def test_consumption_auth_error_starts_reauth(hass, config_entry, mock_client, freezer) -> None:
+    from custom_components.de_dietrich_smart.bdr.models import AuthError
+
+    freezer.move_to(NOW)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    mock_client.fetch_consumption_days.side_effect = AuthError("refusé")
+    for _ in range(3):
+        freezer.tick(timedelta(hours=1, minutes=1))
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+    assert [f["context"]["source"] for f in hass.config_entries.flow.async_progress()] == ["reauth"]
+    assert mock_client.fetch_consumption_days.await_count == 2
+
+
+async def test_gas_today_resets_at_midnight(hass, config_entry, mock_client, freezer) -> None:
+    await hass.config.async_set_time_zone("Europe/Paris")
+    freezer.move_to(NOW)
+    # Heures du 04/11 local seulement (la 24e heure UTC, 23:00 Z, est déjà le 05/11 à Paris).
+    mock_client.fetch_consumption_hours.return_value = hours_of(date(2026, 11, 4), 1.0, count=23)
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    eid = "sensor.maison_exemple_gas_today"
+    assert hass.states.get(eid).attributes["last_reset"] == "2026-11-04T00:00:00+01:00"
+    # 00:30 le lendemain, avant la relève horaire : plus le total de la veille.
+    freezer.move_to(datetime(2026, 11, 4, 23, 30, tzinfo=UTC))
+    config_entry.runtime_data.consumption.async_update_listeners()
+    await hass.async_block_till_done()
+    s = hass.states.get(eid)
+    assert s.state == "unknown" and s.attributes["last_reset"] == "2026-11-05T00:00:00+01:00"

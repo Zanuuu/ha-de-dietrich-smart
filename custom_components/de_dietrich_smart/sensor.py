@@ -16,11 +16,13 @@ from homeassistant.components.sensor import (
 from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfEnergy, UnitOfPressure, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+from homeassistant.util import dt as dt_util
 
 from . import DeDietrichConfigEntry
 from .bdr.models import State
 from .coordinator import DeDietrichCoordinator
 from .curve import flow_temperature
+from .energy import today_kwh
 from .entity import DeDietrichEntity, Kind
 from .faults import describe
 
@@ -209,5 +211,10 @@ class GasTodaySensor(DeDietrichEntity, SensorEntity):
 
     @property
     def native_value(self) -> float | None:
+        # Calculé à la lecture : après minuit, plus le total de la veille.
         data = self.consumption.data
-        return data.today_kwh if data else None
+        return today_kwh(data.hours, dt_util.utcnow(), self.hass.config.time_zone) if data else None
+
+    @property
+    def last_reset(self) -> datetime:
+        return dt_util.start_of_local_day()

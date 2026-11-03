@@ -31,6 +31,9 @@ from .journal import Journal
 
 _LOGGER = logging.getLogger(__name__)
 ORIGIN = events.APP_ORIGIN
+# Retour au programme en échec : nouvel essai 5 min plus tard, 3 essais au plus.
+PENDING_RETRY = 300
+PENDING_ATTEMPTS = 3
 
 
 class CommandError(Exception):
@@ -129,8 +132,9 @@ class CommandRunner:
                 mode, msg = "manual", f"{fmt_temp(setpoint)} jusqu'à {hhmm}"
             else:
                 raise CommandError(f"durée inconnue : {duration}")
-            self.journal.drop_pending(zone_id=z.id)
             res = await self._run("consigne", {"setpoint": setpoint, "duration": duration}, before, factory, msg)
+            # Retour au programme prévu remplacé seulement si la nouvelle commande a abouti.
+            self.journal.drop_pending(zone_id=z.id)
             self.coordinator.expect(f"{z.id}:mode", mode)
             self.coordinator.expect(f"{z.id}:setpoint", setpoint)
             if duration in DURATIONS:
@@ -154,8 +158,8 @@ class CommandRunner:
                 factory = lambda: self.client.zone_antifrost(z.id)  # noqa: E731
             else:
                 raise CommandError(f"mode inconnu : {mode}")
-            self.journal.drop_pending(zone_id=z.id)
             res = await self._run("mode", {"mode": mode}, before, factory, f"Mode {ZONE_MODE_FR[mode].lower()}")
+            self.journal.drop_pending(zone_id=z.id)
             self.coordinator.expect(f"{z.id}:mode", mode)
             return res
 
@@ -165,7 +169,6 @@ class CommandRunner:
             if program not in z.programs:
                 raise CommandError(f"programme inconnu : {program}")
             before = self._zone_before(z)
-            self.journal.drop_pending(zone_id=z.id)
             res = await self._run(
                 "programme",
                 {"program": program},
@@ -173,6 +176,7 @@ class CommandRunner:
                 lambda: self.client.zone_program(z.id, program),
                 f"Programme {program} actif",
             )
+            self.journal.drop_pending(zone_id=z.id)
             self.coordinator.expect(f"{z.id}:program", program)
             self.coordinator.expect(f"{z.id}:mode", "schedule")
             return res
@@ -489,6 +493,11 @@ class CommandRunner:
     # --- Retours au programme différés ------------------------------------
 
     async def async_run_pending(self) -> None:
+        """Retours au programme arrivés à échéance ; sous le verrou, pour ne pas croiser une commande."""
+        async with self._lock:
+            await self._run_pending()
+
+    async def _run_pending(self) -> None:
         now = time.time()
         state = self.coordinator.data
         z = state.zone if state else None
@@ -520,4 +529,13 @@ class CommandRunner:
                 )
                 self.coordinator.expect(f"{zone.id}:mode", "schedule")
             except CommandError as exc:
-                self.journal.add_event(events.event("programme", f"Retour au programme en échec : {exc}", "warning"))
+                attempts = int(p.get("attempts", 0)) + 1
+                if attempts < PENDING_ATTEMPTS:
+                    # Nouvel essai dans 5 min : sinon la zone resterait en manuel permanent.
+                    self.journal.add_pending(
+                        now + PENDING_RETRY, p["action"], p["params"], p["command_id"], exp, attempts
+                    )
+                    msg = f"Retour au programme en échec, nouvel essai dans 5 min : {exc}"
+                else:
+                    msg = f"Retour au programme abandonné après {attempts} essais : {exc}"
+                self.journal.add_event(events.event("programme", msg, "warning"))

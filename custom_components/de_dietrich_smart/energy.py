@@ -15,12 +15,13 @@ from typing import TYPE_CHECKING, Literal
 from zoneinfo import ZoneInfo
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
 from .bdr.cloud import BdrClient
-from .bdr.models import DayConsumption, HourConsumption, SourceError
+from .bdr.models import AuthError, DayConsumption, HourConsumption, SourceError
 from .const import DOMAIN
 
 if TYPE_CHECKING:
@@ -59,7 +60,11 @@ def build_statistics(
                 if (v := _value(h, kind)) is not None:
                     points[h.ts.astimezone(UTC)] = v
         elif day in daily and (v := _value(daily[day], kind)) is not None and day <= today:
-            points[datetime.combine(day, datetime.min.time(), UTC)] = v
+            # Les 24 heures du jour sont écrites (valeur à minuit, 0 ensuite) : elles remplacent
+            # d'éventuelles heures déjà importées, qui laisseraient sinon des sommes périmées.
+            midnight = datetime.combine(day, datetime.min.time(), UTC)
+            for n in range(24):
+                points[midnight + timedelta(hours=n)] = v if n == 0 else 0.0
     out: list[StatisticData] = []
     total = 0.0
     for start in sorted(points):
@@ -98,7 +103,8 @@ class ConsumptionCoordinator(DataUpdateCoordinator[ConsumptionData]):
         self._days: dict[date, DayConsumption] = {}
         self._hours: dict[datetime, HourConsumption] = {}
 
-    async def _async_setup(self) -> None:
+    async def async_load(self) -> None:
+        """Relit les jours et les heures conservés (le cloud ne garde qu'une quinzaine de jours d'heures)."""
         raw = await self._store.async_load() or {}
         for k, (h, d) in (raw.get("days") or {}).items():
             self._days[date.fromisoformat(k)] = DayConsumption(date.fromisoformat(k), h, d)
@@ -112,6 +118,9 @@ class ConsumptionCoordinator(DataUpdateCoordinator[ConsumptionData]):
             "hours": {k.isoformat(): [v.heating_kwh, v.dhw_kwh] for k, v in sorted(self._hours.items())},
         }
 
+    async def async_save(self) -> None:
+        await self._store.async_save(self._dump())
+
     async def _async_update_data(self) -> ConsumptionData:
         a = self.main.data.appliance if self.main.data else None
         if not a:
@@ -123,6 +132,9 @@ class ConsumptionCoordinator(DataUpdateCoordinator[ConsumptionData]):
         try:
             days = await self.client.fetch_consumption_days(a.id, day_start, today)
             hours = await self.client.fetch_consumption_hours(a.id, hour_start, today)
+        except AuthError as exc:
+            # Réauthentification : plus de relève tant que l'entrée n'est pas rechargée.
+            raise ConfigEntryAuthFailed(str(exc)) from exc
         except SourceError as exc:
             raise UpdateFailed(f"consommation indisponible : {exc}") from exc
         self._days.update({d.day: d for d in days})

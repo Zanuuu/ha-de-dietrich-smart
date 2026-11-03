@@ -97,8 +97,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -
         device_id=device.id,
         consumption=consumption,
     )
+    await consumption.async_load()
     # La consommation ne bloque pas le chargement : elle sera relue à l'heure suivante.
     await consumption.async_refresh()
+    # Relève horaire même sans capteur abonné (« gaz du jour » désactivé) : l'import en dépend.
+    entry.async_on_unload(consumption.async_add_listener(lambda: None))
+    entry.async_on_unload(consumption.async_save)
 
     @callback
     def _on_data() -> None:

@@ -392,3 +392,42 @@ async def test_client_factory_used(dashboard):
     await src.close()
     assert [k["follow_redirects"] for k in made] == [False, True]
     assert all(c.request.headers["User-Agent"].startswith("ha-de-dietrich-smart/") for c in respx.calls)
+
+
+@respx.mock
+async def test_sequential_activity_writes_keep_first(src, dashboard):
+    """Deux consignes d'activité de suite : la seconde écriture garde la première."""
+    mock_login(respx)
+    respx.get(f"{b.API}/homes/dashboard").mock(return_value=httpx.Response(200, json=dashboard))
+    respx.get(url__regex=r".*/technicaldetails").mock(return_value=httpx.Response(200, json={}))
+    respx.get(url__regex=r".*/time-programs/.*").mock(return_value=httpx.Response(200, json={"switchPoints": []}))
+    respx.get(f"{b.API}/climate-zones/z1/activities").mock(return_value=httpx.Response(200, json=ACTIVITIES))
+    respx.get(url__regex=r".*/(heating-curve|activeerrors)$").mock(return_value=httpx.Response(404))
+    put = respx.put(f"{b.API}/climate-zones/z1/activities/heating").mock(return_value=httpx.Response(200))
+    await src.start()
+    await src.fetch_state()
+    await src.zone_activities("z1", {1: 17.5})
+    await src.zone_activities("z1", {2: 20.0})
+    await src.close()
+    # La seconde écriture (avant toute relève) garde la consigne Nuit envoyée par la première.
+    assert json.loads(put.calls[1].request.content) == [
+        {"activityNumber": 1, "temperature": 17.5},
+        {"activityNumber": 2, "temperature": 20.0},
+    ]
+
+
+@respx.mock
+async def test_login_refused_is_not_retried(src):
+    """Identifiants refusés : plus aucune tentative de connexion (verrouillage du compte)."""
+    mock_login(respx, ok=False)
+    await src.start()
+    with pytest.raises(AuthError):
+        await src.fetch_state()
+    form = respx.routes[1]
+    calls = form.call_count
+    with pytest.raises(AuthError):
+        await src.fetch_state()
+    with pytest.raises(AuthError):
+        await src.fetch_consumption_days("a1", date(2026, 11, 1), date(2026, 11, 2))
+    await src.close()
+    assert form.call_count == calls == 1
