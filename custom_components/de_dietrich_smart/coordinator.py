@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
+from collections import deque
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.core import HomeAssistant, callback
@@ -37,6 +38,8 @@ class DeDietrichCoordinator(DataUpdateCoordinator[State]):
         self.last_error: str | None = None
         self._expect: list[tuple[float, str, Any]] = []
         self._soon: Any = None
+        # Demande de chauffe relevée à chaque relève, sur la dernière heure : (instant, en chauffe).
+        self._demand: deque[tuple[float, bool]] = deque()
 
     async def _async_update_data(self) -> State:
         try:
@@ -59,7 +62,27 @@ class DeDietrichCoordinator(DataUpdateCoordinator[State]):
         for ev in new_events:
             self.journal.add_event(ev)
         self.previous = prev
+        self._sample_demand(state)
         return state
+
+    def _sample_demand(self, state: State) -> None:
+        now = time.time()
+        if state.zone and state.zone.demand is not None:
+            self._demand.append((now, state.zone.demand == "heating"))
+        while self._demand and now - self._demand[0][0] > 3600:
+            self._demand.popleft()
+
+    @callback
+    def async_set_updated_data(self, data: State) -> None:
+        self._sample_demand(data)
+        super().async_set_updated_data(data)
+
+    @property
+    def heating_ratio(self) -> float | None:
+        """Part des relèves de la dernière heure en chauffe (0 à 1)."""
+        now = time.time()
+        recent = [h for t, h in self._demand if now - t <= 3600]
+        return sum(recent) / len(recent) if recent else None
 
     def expect(self, key: str, value: Any) -> None:
         """Changement attendu suite à une commande : son événement portera l'origine Home Assistant."""

@@ -13,13 +13,23 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.httpx_client import create_async_httpx_client
 
+from . import faults
 from .bdr.cloud import BdrClient
 from .commands import CommandRunner
 from .coordinator import DeDietrichCoordinator
 from .devices import appliance_device_info
 from .journal import Journal
 
-PLATFORMS: list[Platform] = [Platform.CLIMATE, Platform.WATER_HEATER]
+PLATFORMS: list[Platform] = [
+    Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.CLIMATE,
+    Platform.NUMBER,
+    Platform.SELECT,
+    Platform.SENSOR,
+    Platform.SWITCH,
+    Platform.WATER_HEATER,
+]
 
 
 @dataclass
@@ -44,6 +54,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -
         client_factory=partial(create_async_httpx_client, hass, auto_cleanup=False),
     )
     await client.start()
+    # Table des codes défaut lue hors de la boucle (lecture de fichier).
+    await hass.async_add_executor_job(faults.load)
     journal = Journal(hass, entry.entry_id)
     await journal.async_load()
     coordinator = DeDietrichCoordinator(hass, entry, client, journal)

@@ -1,0 +1,602 @@
+{
+ "A00.34": {
+  "kind": "A",
+  "label": "Sonde de température extérieure attendue mais non détectée",
+  "causes": [
+   "Sonde extérieure absente, non raccordée ou mal raccordée : la raccorder correctement"
+  ],
+  "advice": null
+ },
+ "A00.42": {
+  "kind": "A",
+  "label": "Capteur de pression d'eau attendu mais non détecté",
+  "causes": [
+   "Capteur de pression hydraulique non raccordé ou mal raccordé : le raccorder correctement"
+  ],
+  "advice": null
+ },
+ "A02.06": {
+  "kind": "A",
+  "label": "Avertissement de pression d'eau actif",
+  "causes": [
+   "Pression hydraulique trop basse : vérifier la pression hydraulique"
+  ],
+  "advice": "Remettez le circuit en pression, à froid, entre 1,5 et 2 bar (robinet de remplissage sous la chaudière). Si la pression rebaisse en quelques jours, faites rechercher une fuite."
+ },
+ "A02.18": {
+  "kind": "A",
+  "label": "Erreur du dictionnaire d'objets",
+  "causes": [
+   "Erreur de configuration : réinitialiser CN1 et CN2 (valeurs sur la plaque signalétique)"
+  ],
+  "advice": null
+ },
+ "A02.33": {
+  "kind": "A",
+  "label": "Délai dépassé pour le remplissage automatique",
+  "causes": [
+   "Pression basse ou nulle dans la conduite d'alimentation : vérifier que le robinet d'eau principal est totalement ouvert",
+   "Fuite d'eau dans la chaudière ou l'installation : vérifier l'étanchéité",
+   "Vérifier les paramètres AP069 (durée maximum de remplissage), AP006 et AP070 (pressions minimum et maximum)",
+   "Robinet de l'unité de remplissage automatique défectueux : remplacer l'unité"
+  ],
+  "advice": null
+ },
+ "A02.34": {
+  "kind": "A",
+  "label": "Remplissages automatiques trop rapprochés",
+  "causes": [
+   "Fuite d'eau dans la chaudière ou l'installation : vérifier l'étanchéité",
+   "Dernier remplissage interrompu ou pression d'alimentation momentanément trop basse"
+  ],
+  "advice": null
+ },
+ "A02.36": {
+  "kind": "A",
+  "label": "Dispositif fonctionnel déconnecté",
+  "causes": [
+   "Carte SCB introuvable : vérifier le câblage et les connecteurs",
+   "Carte SCB défectueuse : la remplacer"
+  ],
+  "advice": null
+ },
+ "A02.37": {
+  "kind": "A",
+  "label": "Dispositif non critique déconnecté",
+  "causes": [
+   "Carte SCB introuvable : vérifier le câblage et les connecteurs",
+   "Carte SCB défectueuse : la remplacer"
+  ],
+  "advice": null
+ },
+ "A02.45": {
+  "kind": "A",
+  "label": "Matrice de connexion Full CAN",
+  "causes": [
+   "Carte SCB introuvable : réaliser une détection automatique"
+  ],
+  "advice": null
+ },
+ "A02.46": {
+  "kind": "A",
+  "label": "Administration d'appareil Full CAN",
+  "causes": [
+   "Carte SCB introuvable : réaliser une détection automatique"
+  ],
+  "advice": null
+ },
+ "A02.48": {
+  "kind": "A",
+  "label": "Défaut de configuration des groupes de fonctions",
+  "causes": [
+   "Carte SCB introuvable : réaliser une détection automatique"
+  ],
+  "advice": null
+ },
+ "A02.49": {
+  "kind": "A",
+  "label": "Échec d'initialisation du nœud",
+  "causes": [
+   "Carte SCB introuvable : réaliser une détection automatique"
+  ],
+  "advice": null
+ },
+ "A02.76": {
+  "kind": "A",
+  "label": "Mémoire des paramètres personnalisés pleine, modification impossible",
+  "causes": [
+   "Erreur de configuration : réinitialiser CN1 et CN2",
+   "CSU défectueux : remplacer la carte CSU",
+   "Remplacer la carte CU-GH"
+  ],
+  "advice": null
+ },
+ "E00.04": {
+  "kind": "E",
+  "label": "Sonde de retour absente ou mesure sous la plage",
+  "causes": [
+   "Mauvaise connexion : vérifier le câblage et les connecteurs",
+   "Sonde mal installée : vérifier son montage",
+   "Sonde défectueuse : la remplacer"
+  ],
+  "advice": null
+ },
+ "E00.05": {
+  "kind": "E",
+  "label": "Sonde de retour en court-circuit ou mesure au-dessus de la plage",
+  "causes": [
+   "Mauvaise connexion : vérifier le câblage et les connecteurs",
+   "Sonde mal installée : vérifier son montage",
+   "Sonde défectueuse : la remplacer"
+  ],
+  "advice": null
+ },
+ "E00.06": {
+  "kind": "E",
+  "label": "Sonde de retour attendue mais non détectée",
+  "causes": [
+   "Mauvaise connexion : vérifier le câblage et les connecteurs",
+   "Sonde défectueuse : la remplacer"
+  ],
+  "advice": null
+ },
+ "E00.07": {
+  "kind": "E",
+  "label": "Écart trop grand entre départ et retour",
+  "causes": [
+   "Aucune circulation : purger l'installation, contrôler la pression hydraulique, la circulation (sens, pompe, vannes), la pompe de chauffage, la propreté de l'échangeur",
+   "Le cas échéant : vérifier le paramètre du type de chaudière",
+   "Sonde absente, mal raccordée ou défectueuse : la vérifier, la remplacer"
+  ],
+  "advice": "Vérifiez la pression du circuit : entre 1,5 et 2 bar à froid. Vérifiez aussi que les robinets des radiateurs ne sont pas tous fermés."
+ },
+ "E00.16": {
+  "kind": "E",
+  "label": "Sonde du ballon d'eau chaude absente ou mesure sous la plage",
+  "causes": [
+   "Mauvaise connexion : vérifier le câblage et les connecteurs",
+   "Sonde défectueuse : la remplacer"
+  ],
+  "advice": null
+ },
+ "E00.17": {
+  "kind": "E",
+  "label": "Sonde du ballon d'eau chaude en court-circuit ou mesure au-dessus de la plage",
+  "causes": [
+   "Mauvaise connexion : vérifier le câblage et les connecteurs",
+   "Sonde défectueuse : la remplacer"
+  ],
+  "advice": null
+ },
+ "E01.04": {
+  "kind": "E",
+  "label": "Cinq pertes de flamme involontaires",
+  "causes": [
+   "Purger le conduit gaz",
+   "Vérifier que la vanne gaz est totalement ouverte et la pression d'alimentation en gaz",
+   "Vérifier le fonctionnement et le réglage du bloc vanne gaz",
+   "Vérifier que l'arrivée d'air et l'évacuation des fumées ne sont pas obstruées, et que les fumées ne sont pas réaspirées"
+  ],
+  "advice": "Vérifiez que le robinet gaz sous la chaudière est complètement ouvert et que le gaz arrive (cuisinière, compteur)."
+ },
+ "E01.11": {
+  "kind": "E",
+  "label": "Vitesse du ventilateur hors de la plage normale",
+  "causes": [
+   "Mauvaise connexion : vérifier le câblage et les connecteurs",
+   "Ventilateur défectueux : le remplacer",
+   "Ventilateur qui tourne sans demande : vérifier que le tirage de la cheminée n'est pas excessif"
+  ],
+  "advice": null
+ },
+ "E01.12": {
+  "kind": "E",
+  "label": "Température de retour supérieure à la température de départ",
+  "causes": [
+   "Départ et retour inversés : vérifier le câblage et les connecteurs",
+   "Circulation dans le mauvais sens : contrôler la circulation (sens, pompe, vannes)",
+   "Sonde mal installée ou défectueuse : vérifier son montage et sa valeur ohmique, la remplacer"
+  ],
+  "advice": null
+ },
+ "E02.13": {
+  "kind": "E",
+  "label": "Entrée de blocage externe active",
+  "causes": [
+   "Cause externe : l'éliminer",
+   "Vérifier les paramètres"
+  ],
+  "advice": "Une commande extérieure à la chaudière la bloque (délestage, sécurité, contact externe) : vérifiez si un tel équipement est installé."
+ },
+ "E02.15": {
+  "kind": "E",
+  "label": "Délai dépassé pour le CSU externe",
+  "causes": [
+   "Mauvaise connexion : vérifier le câblage et les connecteurs",
+   "CSU défectueux : le remplacer"
+  ],
+  "advice": null
+ },
+ "E02.17": {
+  "kind": "E",
+  "label": "Délai dépassé pour la communication avec la commande des vannes gaz",
+  "causes": [
+   "Erreur de communication avec le noyau de sécurité : redémarrer la chaudière",
+   "Remplacer la carte CU-GH"
+  ],
+  "advice": null
+ },
+ "E02.32": {
+  "kind": "E",
+  "label": "Remplissage automatique trop long",
+  "causes": [
+   "Vérifier l'étanchéité et la pression hydraulique de l'installation",
+   "Vérifier que les robinets de gaz et d'eau principal sont totalement ouverts",
+   "Contrôler le capteur de pression et la soupape de sécurité"
+  ],
+  "advice": null
+ },
+ "E02.35": {
+  "kind": "E",
+  "label": "Dispositif critique de sécurité déconnecté",
+  "causes": [
+   "Défaut de communication : réaliser une détection automatique"
+  ],
+  "advice": null
+ },
+ "E02.39": {
+  "kind": "E",
+  "label": "Pression insuffisante après remplissage automatique",
+  "causes": [
+   "Vérifier l'étanchéité et la pression hydraulique de l'installation",
+   "Vérifier que les robinets de gaz et d'eau principal sont totalement ouverts",
+   "Contrôler le capteur de pression et la soupape de sécurité"
+  ],
+  "advice": null
+ },
+ "E02.47": {
+  "kind": "E",
+  "label": "Échec de connexion des groupes de fonctions",
+  "causes": [
+   "Groupe de fonctions introuvable : réaliser une détection automatique",
+   "Redémarrer la chaudière",
+   "Remplacer la carte CU-GH"
+  ],
+  "advice": null
+ },
+ "E04.01": {
+  "kind": "E",
+  "label": "Sonde de départ en court-circuit ou mesure au-dessus de la plage",
+  "causes": [
+   "Mauvaise connexion : vérifier le câblage et les connecteurs",
+   "Sonde mal installée : vérifier son montage",
+   "Sonde défectueuse : la remplacer"
+  ],
+  "advice": null
+ },
+ "E04.02": {
+  "kind": "E",
+  "label": "Sonde de départ déconnectée ou mesure sous la plage",
+  "causes": [
+   "Mauvaise connexion : vérifier le câblage et les connecteurs",
+   "Sonde défectueuse : la remplacer"
+  ],
+  "advice": null
+ },
+ "E04.03": {
+  "kind": "E",
+  "label": "Température de départ au-delà de la limite de sécurité",
+  "causes": [
+   "Débit absent ou insuffisant : contrôler la circulation (sens, pompe, vannes), la pression hydraulique, la propreté de l'échangeur"
+  ],
+  "advice": "Vérifiez la pression du circuit : entre 1,5 et 2 bar à froid. Vérifiez aussi que les robinets des radiateurs ne sont pas tous fermés."
+ },
+ "E04.04": {
+  "kind": "E",
+  "label": "Sonde de fumées en court-circuit ou mesure au-dessus de la plage",
+  "causes": [
+   "Mauvaise connexion : vérifier le câblage et les connecteurs",
+   "Sonde mal installée : vérifier son montage",
+   "Sonde défectueuse : la remplacer"
+  ],
+  "advice": null
+ },
+ "E04.05": {
+  "kind": "E",
+  "label": "Sonde de fumées déconnectée ou mesure sous la plage",
+  "causes": [
+   "Mauvaise connexion : vérifier le câblage et les connecteurs",
+   "Sonde mal installée : vérifier son montage",
+   "Sonde défectueuse : la remplacer"
+  ],
+  "advice": null
+ },
+ "E04.07": {
+  "kind": "E",
+  "label": "Écart trop grand entre les sondes de départ 1 et 2",
+  "causes": [
+   "Mauvaise connexion : vérifier le raccordement",
+   "Sonde défectueuse : la remplacer"
+  ],
+  "advice": null
+ },
+ "E04.08": {
+  "kind": "E",
+  "label": "Entrée de sécurité ouverte (pression des fumées)",
+  "causes": [
+   "Pressostat différentiel d'air activé : vérifier le câblage et les connecteurs",
+   "Pression trop élevée dans l'évacuation des fumées : robinet de barrage qui ne s'ouvre pas, siphon bouché ou vide, conduits d'air ou de fumées obstrués, échangeur encrassé"
+  ],
+  "advice": "Vérifiez que le terminal de fumées (ventouse) à l'extérieur n'est pas obstrué : nid, feuilles, neige, givre."
+ },
+ "E04.09": {
+  "kind": "E",
+  "label": "Écart trop grand entre les sondes de fumées 1 et 2",
+  "causes": [
+   "Mauvaise connexion : vérifier le raccordement",
+   "Sonde défectueuse : la remplacer"
+  ],
+  "advice": null
+ },
+ "E04.10": {
+  "kind": "E",
+  "label": "Cinq échecs d'allumage",
+  "causes": [
+   "Pas d'étincelle : vérifier le câblage CU-GH – transformateur d'allumage, l'électrode d'ionisation/allumage, la mise à la terre, le capot du brûleur ; remplacer la carte CU-GH",
+   "Étincelle sans flamme : purger le conduit gaz, vérifier l'arrivée d'air et l'évacuation des fumées, la vanne gaz, la pression d'alimentation, le réglage et le câblage du bloc vanne gaz ; remplacer la carte CU-GH",
+   "Flamme sans ionisation suffisante : vérifier la vanne gaz, la pression d'alimentation, l'électrode, la mise à la terre et son câblage"
+  ],
+  "advice": "Vérifiez que le robinet gaz sous la chaudière est complètement ouvert et que le gaz arrive (cuisinière, compteur)."
+ },
+ "E04.11": {
+  "kind": "E",
+  "label": "Échec du contrôle d'étanchéité de la vanne gaz",
+  "causes": [
+   "Mauvaise connexion : vérifier le câblage et les connecteurs",
+   "Contrôleur de fuite de gaz défectueux : le remplacer",
+   "Bloc vanne gaz défectueux : le remplacer"
+  ],
+  "advice": null
+ },
+ "E04.12": {
+  "kind": "E",
+  "label": "Flamme parasite détectée avant le démarrage du brûleur",
+  "causes": [
+   "Brûleur incandescent : régler l'O2",
+   "Courant d'ionisation sans flamme : contrôler l'électrode d'allumage et d'ionisation",
+   "Vanne gaz ou transformateur d'allumage défectueux : le remplacer"
+  ],
+  "advice": null
+ },
+ "E04.13": {
+  "kind": "E",
+  "label": "Vitesse du ventilateur au-dessus de la plage normale",
+  "causes": [
+   "Mauvaise connexion : vérifier le câblage et les connecteurs",
+   "Ventilateur qui tourne sans demande : vérifier que le tirage de la cheminée n'est pas excessif",
+   "Ventilateur défectueux : le remplacer"
+  ],
+  "advice": null
+ },
+ "E04.15": {
+  "kind": "E",
+  "label": "Évacuation des fumées obstruée",
+  "causes": [
+   "Vérifier que la buse de fumées n'est pas bloquée",
+   "Remettre la chaudière en service"
+  ],
+  "advice": "Vérifiez que le terminal de fumées (ventouse) à l'extérieur n'est pas obstrué : nid, feuilles, neige, givre."
+ },
+ "E04.17": {
+  "kind": "E",
+  "label": "Commande de la vanne gaz défectueuse",
+  "causes": [
+   "Mauvaise connexion : vérifier le câblage et les connecteurs",
+   "Bloc vanne gaz défectueux : le remplacer"
+  ],
+  "advice": null
+ },
+ "E04.23": {
+  "kind": "E",
+  "label": "Verrouillage interne de la commande de vanne gaz",
+  "causes": [
+   "Redémarrer la chaudière",
+   "Remplacer la carte CU-GH"
+  ],
+  "advice": null
+ },
+ "H01.00": {
+  "kind": "H",
+  "label": "Erreur de communication avec le noyau de sécurité",
+  "causes": [
+   "Redémarrer la chaudière",
+   "Remplacer la carte CU-GH"
+  ],
+  "advice": "Coupez la chaudière, attendez quelques secondes, puis rallumez-la."
+ },
+ "H01.05": {
+  "kind": "H",
+  "label": "Écart maximum entre départ et retour dépassé",
+  "causes": [
+   "Débit absent ou insuffisant : contrôler la circulation (sens, pompes, vannes), la pression hydraulique, la propreté de l'échangeur",
+   "Erreur de sonde : vérifier le fonctionnement et le montage des sondes"
+  ],
+  "advice": "Vérifiez la pression du circuit : entre 1,5 et 2 bar à froid. Vérifiez aussi que les robinets des radiateurs ne sont pas tous fermés."
+ },
+ "H01.08": {
+  "kind": "H",
+  "label": "Température de l'échangeur au-delà de la limite (Delta T max 3)",
+  "causes": [
+   "Débit absent ou insuffisant : contrôler la circulation (sens, pompe, vannes), la pression hydraulique, la propreté de l'échangeur",
+   "Purger l'installation de chauffage",
+   "Erreur de sonde : vérifier le fonctionnement et le montage des sondes"
+  ],
+  "advice": "Vérifiez la pression du circuit : entre 1,5 et 2 bar à froid. Vérifiez aussi que les robinets des radiateurs ne sont pas tous fermés."
+ },
+ "H01.09": {
+  "kind": "H",
+  "label": "Pression de gaz trop faible (pressostat gaz)",
+  "causes": [
+   "Vérifier que la vanne gaz est totalement ouverte et la pression d'alimentation en gaz",
+   "Pressostat gaz GPS mal réglé ou mal monté : le vérifier, le remplacer si nécessaire"
+  ],
+  "advice": "Vérifiez que le robinet gaz sous la chaudière est complètement ouvert et que le gaz arrive (cuisinière, compteur)."
+ },
+ "H01.14": {
+  "kind": "H",
+  "label": "Température de départ au-delà du maximum de fonctionnement",
+  "causes": [
+   "Mauvaise connexion : vérifier le câblage et les connecteurs",
+   "Débit absent ou insuffisant : contrôler la circulation (sens, pompe, vannes), la pression hydraulique, la propreté de l'échangeur"
+  ],
+  "advice": "Vérifiez la pression du circuit : entre 1,5 et 2 bar à froid. Vérifiez aussi que les robinets des radiateurs ne sont pas tous fermés."
+ },
+ "H01.21": {
+  "kind": "H",
+  "label": "Température de départ montée trop vite en eau chaude",
+  "causes": [
+   "Contrôler la circulation (sens, pompes, vannes)",
+   "Vérifier le fonctionnement de la pompe"
+  ],
+  "advice": null
+ },
+ "H02.00": {
+  "kind": "H",
+  "label": "Réinitialisation en cours",
+  "causes": [
+   "Aucune action"
+  ],
+  "advice": "Réinitialisation en cours : rien à faire, la chaudière reprend d'elle-même."
+ },
+ "H02.02": {
+  "kind": "H",
+  "label": "En attente du numéro de configuration",
+  "causes": [
+   "Erreur de configuration ou numéro de configuration inconnu : réinitialiser CN1 et CN2"
+  ],
+  "advice": null
+ },
+ "H02.03": {
+  "kind": "H",
+  "label": "Erreur de configuration",
+  "causes": [
+   "Erreur de configuration ou numéro de configuration inconnu : réinitialiser CN1 et CN2"
+  ],
+  "advice": null
+ },
+ "H02.04": {
+  "kind": "H",
+  "label": "Erreur de paramètre",
+  "causes": [
+   "Réglages d'usine incorrects : remettre la chaudière en service",
+   "Réinitialiser CN1 et CN2",
+   "Remplacer la carte CU-GH"
+  ],
+  "advice": null
+ },
+ "H02.05": {
+  "kind": "H",
+  "label": "Le CSU n'est pas compatible avec le CU",
+  "causes": [
+   "Erreur de configuration : réinitialiser CN1 et CN2"
+  ],
+  "advice": null
+ },
+ "H02.09": {
+  "kind": "H",
+  "label": "Blocage partiel de l'appareil",
+  "causes": [
+   "Entrée de blocage active ou protection antigel active",
+   "Cause externe : l'éliminer ; vérifier les paramètres et le raccordement"
+  ],
+  "advice": "Une commande extérieure à la chaudière la bloque (délestage, sécurité, contact externe) : vérifiez si un tel équipement est installé."
+ },
+ "H02.10": {
+  "kind": "H",
+  "label": "Blocage complet de l'appareil",
+  "causes": [
+   "Entrée de blocage active (sans protection antigel)",
+   "Cause externe : l'éliminer ; vérifier les paramètres et le raccordement"
+  ],
+  "advice": "Une commande extérieure à la chaudière la bloque (délestage, sécurité, contact externe) : vérifiez si un tel équipement est installé."
+ },
+ "H02.12": {
+  "kind": "H",
+  "label": "Signal de déblocage externe attendu",
+  "causes": [
+   "Temps d'attente du signal de déclenchement écoulé",
+   "Cause externe : l'éliminer ; vérifier les paramètres et le raccordement"
+  ],
+  "advice": "Une commande extérieure à la chaudière la bloque (délestage, sécurité, contact externe) : vérifiez si un tel équipement est installé."
+ },
+ "H02.31": {
+  "kind": "H",
+  "label": "Pression faible : remplissage automatique nécessaire",
+  "causes": [
+   "Remplir l'installation avec le dispositif de remplissage automatique"
+  ],
+  "advice": "Remettez le circuit en pression, à froid, entre 1,5 et 2 bar."
+ },
+ "H02.55": {
+  "kind": "H",
+  "label": "Numéro de série manquant ou invalide",
+  "causes": [
+   "Remplacer la carte CU-GH"
+  ],
+  "advice": null
+ },
+ "H02.70": {
+  "kind": "H",
+  "label": "Échec du test du récupérateur de chaleur externe",
+  "causes": [
+   "Contrôler le système de récupération de chaleur externe"
+  ],
+  "advice": null
+ },
+ "H03.00": {
+  "kind": "H",
+  "label": "Paramètres de sécurité incorrects ou manquants",
+  "causes": [
+   "Erreur de paramètre du noyau de sécurité : redémarrer la chaudière",
+   "Remplacer la carte CU-GH"
+  ],
+  "advice": "Coupez la chaudière, attendez quelques secondes, puis rallumez-la."
+ },
+ "H03.01": {
+  "kind": "H",
+  "label": "Erreur de transmission entre le CU et la CVG",
+  "causes": [
+   "Erreur de communication avec la carte CU-GH : redémarrer la chaudière"
+  ],
+  "advice": "Coupez la chaudière, attendez quelques secondes, puis rallumez-la."
+ },
+ "H03.02": {
+  "kind": "H",
+  "label": "Perte de flamme pendant le fonctionnement",
+  "causes": [
+   "Pas de courant d'ionisation : purger le conduit gaz",
+   "Vérifier que la vanne gaz est totalement ouverte et la pression d'alimentation en gaz",
+   "Vérifier le fonctionnement et le réglage du bloc vanne gaz",
+   "Vérifier que l'arrivée d'air et l'évacuation des fumées ne sont pas obstruées, et que les fumées ne sont pas réaspirées"
+  ],
+  "advice": "Vérifiez que le robinet gaz sous la chaudière est complètement ouvert et que le gaz arrive (cuisinière, compteur)."
+ },
+ "H03.05": {
+  "kind": "H",
+  "label": "Blocage interne de la commande de vanne gaz",
+  "causes": [
+   "Erreur du noyau de sécurité : redémarrer la chaudière",
+   "Remplacer la carte CU-GH"
+  ],
+  "advice": "Coupez la chaudière, attendez quelques secondes, puis rallumez-la."
+ },
+ "H03.17": {
+  "kind": "H",
+  "label": "Vérification périodique de sécurité en cours",
+  "causes": [
+   "Redémarrer la chaudière",
+   "Remplacer la carte CU-GH"
+  ],
+  "advice": null
+ }
+}

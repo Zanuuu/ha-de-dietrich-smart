@@ -116,6 +116,114 @@
           "eco": "Eco (frost protection)"
         }
       }
+    },
+    "sensor": {
+      "room_temperature": {
+        "name": "Room temperature"
+      },
+      "outdoor_temperature": {
+        "name": "Outdoor temperature",
+        "state_attributes": {
+          "source": {
+            "name": "Source"
+          }
+        }
+      },
+      "water_pressure": {
+        "name": "Water pressure"
+      },
+      "activity": {
+        "name": "Activity",
+        "state": {
+          "heating": "Heating",
+          "dhw": "Hot water",
+          "idle": "Idle"
+        }
+      },
+      "error_status": {
+        "name": "Error status"
+      },
+      "fault_code": {
+        "name": "Fault code",
+        "state_attributes": {
+          "label": {
+            "name": "Label"
+          },
+          "advice": {
+            "name": "Advice"
+          },
+          "causes": {
+            "name": "Causes"
+          }
+        }
+      },
+      "override_end": {
+        "name": "Override end"
+      },
+      "next_switch": {
+        "name": "Next switch"
+      },
+      "heating_curve_flow": {
+        "name": "Heating curve flow"
+      },
+      "heating_ratio": {
+        "name": "Heating ratio"
+      }
+    },
+    "binary_sensor": {
+      "online": {
+        "name": "Online"
+      },
+      "problem": {
+        "name": "Problem"
+      },
+      "low_pressure": {
+        "name": "Low pressure"
+      },
+      "holiday": {
+        "name": "Holiday"
+      },
+      "heating": {
+        "name": "Heating"
+      },
+      "preheat": {
+        "name": "Preheat"
+      },
+      "dhw_heating": {
+        "name": "Heating"
+      }
+    },
+    "number": {
+      "heating_curve_slope": {
+        "name": "Heating curve slope"
+      },
+      "heating_curve_base": {
+        "name": "Heating curve base"
+      },
+      "activity_setpoint": {
+        "name": "Activity {activity} setpoint"
+      },
+      "dhw_comfort_setpoint": {
+        "name": "Comfort setpoint"
+      },
+      "dhw_reduced_setpoint": {
+        "name": "Reduced setpoint"
+      }
+    },
+    "select": {
+      "program": {
+        "name": "Program"
+      }
+    },
+    "switch": {
+      "fireplace": {
+        "name": "Fireplace"
+      }
+    },
+    "button": {
+      "boost": {
+        "name": "Boost"
+      }
     }
   },
   "exceptions": {

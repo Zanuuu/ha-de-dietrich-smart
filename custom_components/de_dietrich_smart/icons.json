@@ -1,0 +1,97 @@
+{
+  "entity": {
+    "sensor": {
+      "water_pressure": {
+        "default": "mdi:gauge"
+      },
+      "activity": {
+        "default": "mdi:fire",
+        "state": {
+          "idle": "mdi:fire-off",
+          "dhw": "mdi:water-boiler"
+        }
+      },
+      "error_status": {
+        "default": "mdi:alert-circle-outline"
+      },
+      "fault_code": {
+        "default": "mdi:alert-octagon-outline"
+      },
+      "override_end": {
+        "default": "mdi:timer-sand"
+      },
+      "next_switch": {
+        "default": "mdi:calendar-clock"
+      },
+      "heating_curve_flow": {
+        "default": "mdi:chart-bell-curve-cumulative"
+      },
+      "heating_ratio": {
+        "default": "mdi:percent-circle-outline"
+      }
+    },
+    "binary_sensor": {
+      "holiday": {
+        "default": "mdi:bag-suitcase-off",
+        "state": {
+          "on": "mdi:bag-suitcase"
+        }
+      },
+      "preheat": {
+        "default": "mdi:radiator"
+      },
+      "low_pressure": {
+        "default": "mdi:gauge-low"
+      }
+    },
+    "number": {
+      "heating_curve_slope": {
+        "default": "mdi:chart-line-variant"
+      },
+      "heating_curve_base": {
+        "default": "mdi:arrow-collapse-down"
+      },
+      "activity_setpoint": {
+        "default": "mdi:home-thermometer-outline"
+      },
+      "dhw_comfort_setpoint": {
+        "default": "mdi:water-thermometer"
+      },
+      "dhw_reduced_setpoint": {
+        "default": "mdi:water-thermometer-outline"
+      }
+    },
+    "select": {
+      "program": {
+        "default": "mdi:calendar-week"
+      }
+    },
+    "switch": {
+      "fireplace": {
+        "default": "mdi:fireplace-off",
+        "state": {
+          "on": "mdi:fireplace"
+        }
+      }
+    },
+    "button": {
+      "boost": {
+        "default": "mdi:rocket-launch-outline"
+      }
+    },
+    "climate": {
+      "zone": {
+        "state_attributes": {
+          "preset_mode": {
+            "state": {
+              "schedule": "mdi:calendar-clock",
+              "manual": "mdi:hand-back-right",
+              "antifrost": "mdi:snowflake-thermometer",
+              "fireplace": "mdi:fireplace"
+            }
+          }
+        }
+      }
+    }
+  }
+}

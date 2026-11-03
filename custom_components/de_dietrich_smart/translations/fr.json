@@ -116,6 +116,114 @@
           "eco": "Éco (hors-gel)"
         }
       }
+    },
+    "sensor": {
+      "room_temperature": {
+        "name": "Température ambiante"
+      },
+      "outdoor_temperature": {
+        "name": "Température extérieure",
+        "state_attributes": {
+          "source": {
+            "name": "Source"
+          }
+        }
+      },
+      "water_pressure": {
+        "name": "Pression d'eau"
+      },
+      "activity": {
+        "name": "Activité",
+        "state": {
+          "heating": "Chauffage",
+          "dhw": "Eau chaude",
+          "idle": "Repos"
+        }
+      },
+      "error_status": {
+        "name": "État d'erreur"
+      },
+      "fault_code": {
+        "name": "Code défaut",
+        "state_attributes": {
+          "label": {
+            "name": "Signification"
+          },
+          "advice": {
+            "name": "Conseil"
+          },
+          "causes": {
+            "name": "Causes"
+          }
+        }
+      },
+      "override_end": {
+        "name": "Fin de dérogation"
+      },
+      "next_switch": {
+        "name": "Prochain changement"
+      },
+      "heating_curve_flow": {
+        "name": "Départ selon la courbe"
+      },
+      "heating_ratio": {
+        "name": "Part de chauffe"
+      }
+    },
+    "binary_sensor": {
+      "online": {
+        "name": "En ligne"
+      },
+      "problem": {
+        "name": "Défaut"
+      },
+      "low_pressure": {
+        "name": "Pression basse"
+      },
+      "holiday": {
+        "name": "Vacances"
+      },
+      "heating": {
+        "name": "Chauffe"
+      },
+      "preheat": {
+        "name": "Préchauffage"
+      },
+      "dhw_heating": {
+        "name": "Chauffe"
+      }
+    },
+    "number": {
+      "heating_curve_slope": {
+        "name": "Pente de la courbe de chauffe"
+      },
+      "heating_curve_base": {
+        "name": "Pied de courbe"
+      },
+      "activity_setpoint": {
+        "name": "Consigne {activity}"
+      },
+      "dhw_comfort_setpoint": {
+        "name": "Consigne confort"
+      },
+      "dhw_reduced_setpoint": {
+        "name": "Consigne réduite"
+      }
+    },
+    "select": {
+      "program": {
+        "name": "Programme"
+      }
+    },
+    "switch": {
+      "fireplace": {
+        "name": "Mode cheminée"
+      }
+    },
+    "button": {
+      "boost": {
+        "name": "Boost"
+      }
     }
   },
   "exceptions": {
