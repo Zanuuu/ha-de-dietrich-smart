@@ -1,0 +1,89 @@
+"""API WebSocket du panneau et enregistrement du panneau latéral."""
+
+import copy
+from unittest.mock import AsyncMock, patch
+
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
+T = "de_dietrich_smart"
+
+
+async def ws(client, msg_id, **msg):
+    await client.send_json({"id": msg_id, **msg})
+    return await client.receive_json()
+
+
+async def test_ws_overview(hass, loaded, config_entry, hass_ws_client):
+    client = await hass_ws_client(hass)
+    res = await ws(client, 1, type=f"{T}/overview")
+    assert res["success"]
+    (e,) = res["result"]["entries"]
+    assert e["entry_id"] == config_entry.entry_id and e["title"] == "EMC-S"
+    z = e["state"]["appliances"][0]["zones"][0]
+    assert z["setpoint"] == 21.0 and [a["name"] for a in z["activities"]][:2] == ["Nuit", "Maison"]
+    assert e["undo"] is None
+
+
+async def test_ws_set_week_validates(hass, loaded, config_entry, state, hass_ws_client, mock_client):
+    s = copy.deepcopy(state)
+    s.zone.week = {2: [{"day": 1, "time": "06:00", "activity": 2, "setpoint": None}]}
+    loaded.coordinator.async_set_updated_data(s)
+    client = await hass_ws_client(hass)
+    seven = [{"day": 2, "time": f"0{h}:00", "activity": 1} for h in range(7)]
+    res = await ws(client, 1, type=f"{T}/set_week", entry_id=config_entry.entry_id, program=2, switch_points=seven)
+    assert not res["success"] and res["error"]["code"] == "command_failed"
+    assert "6 créneaux au plus par jour" in res["error"]["message"]
+    ok = [{"day": 1, "time": "06:30", "activity": 4}]
+    res = await ws(client, 2, type=f"{T}/set_week", entry_id=config_entry.entry_id, program=2, switch_points=ok)
+    assert res["success"] and res["result"]["undo_until"] is not None
+    mock_client.zone_week.assert_awaited_once()
+
+
+async def test_ws_write_requires_admin(hass, loaded, config_entry, hass_ws_client, hass_read_only_access_token):
+    client = await hass_ws_client(hass, hass_read_only_access_token)
+    res = await ws(client, 1, type=f"{T}/set_activity", entry_id=config_entry.entry_id, activity=1, setpoint=17)
+    assert not res["success"] and res["error"]["code"] == "unauthorized"
+    res = await ws(client, 2, type=f"{T}/overview")
+    assert res["success"]
+
+
+async def test_ws_undo_and_journal(hass, loaded, config_entry, hass_ws_client, mock_client):
+    client = await hass_ws_client(hass)
+    res = await ws(client, 1, type=f"{T}/set_activity", entry_id=config_entry.entry_id, activity=1, setpoint=17)
+    cid = res["result"]["command_id"]
+    overview = await ws(client, 2, type=f"{T}/overview")
+    assert overview["result"]["entries"][0]["undo"]["command_id"] == cid
+    res = await ws(client, 3, type=f"{T}/undo", entry_id=config_entry.entry_id, command_id=cid)
+    assert res["success"]
+    mock_client.zone_activities.assert_awaited_with("z1", {1: 18.0})
+    res = await ws(client, 4, type=f"{T}/journal", entry_id=config_entry.entry_id, limit=10)
+    assert [c["action"] for c in res["result"]["commands"]] == ["annulation", "activite"]
+
+
+async def test_ws_unknown_entry(hass, loaded, hass_ws_client):
+    client = await hass_ws_client(hass)
+    res = await ws(client, 1, type=f"{T}/journal", entry_id="nope")
+    assert not res["success"] and res["error"]["code"] == "not_found"
+
+
+async def test_panel_registered_once_for_two_entries(hass, config_entry, mock_client):
+    # Même chaudière simulée pour les deux entrées : les doublons d'entités sont ignorés par HA.
+    other = MockConfigEntry(domain=T, unique_id="autre", data=dict(config_entry.data))
+    other.add_to_hass(hass)
+    hass.config.components.add("frontend")
+    with (
+        patch("homeassistant.components.http.HomeAssistantHTTP.async_register_static_paths", AsyncMock()) as static,
+        patch("homeassistant.components.panel_custom.async_register_panel", AsyncMock()) as register,
+        patch("homeassistant.components.frontend.async_remove_panel") as remove,
+    ):
+        # Le chargement de l'intégration charge les deux entrées.
+        assert await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+        assert len(hass.config_entries.async_loaded_entries(T)) == 2
+        assert register.await_count == 1
+        assert register.await_args.kwargs["frontend_url_path"] == "de-dietrich-smart"
+        static.assert_awaited_once()
+        assert await hass.config_entries.async_unload(config_entry.entry_id)
+        remove.assert_not_called()
+        assert await hass.config_entries.async_unload(other.entry_id)
+        remove.assert_called_once_with(hass, "de-dietrich-smart")

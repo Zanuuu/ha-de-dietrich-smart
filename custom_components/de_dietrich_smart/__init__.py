@@ -14,7 +14,7 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.httpx_client import create_async_httpx_client
 from homeassistant.helpers.typing import ConfigType
 
-from . import faults
+from . import faults, panel
 from .bdr.cloud import BdrClient
 from .commands import CommandRunner
 from .const import DOMAIN
@@ -24,6 +24,7 @@ from .energy import ConsumptionCoordinator
 from .journal import Journal
 from .repairs import async_update_issues
 from .services import async_setup_services
+from .websocket import async_setup_websocket
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
@@ -55,6 +56,7 @@ CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     async_setup_services(hass)
+    async_setup_websocket(hass)
     return True
 
 
@@ -117,8 +119,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -
     entry.async_on_unload(client.close)
     entry.async_on_unload(journal.async_save)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    await panel.async_register(hass)
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -> bool:
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+    if ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        panel.async_unregister(hass, entry.entry_id)
+    return ok
