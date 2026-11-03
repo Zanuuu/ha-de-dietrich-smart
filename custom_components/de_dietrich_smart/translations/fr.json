@@ -168,6 +168,9 @@
       },
       "heating_ratio": {
         "name": "Part de chauffe"
+      },
+      "gas_today": {
+        "name": "Gaz aujourd'hui"
       }
     },
     "binary_sensor": {

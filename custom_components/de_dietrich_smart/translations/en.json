@@ -168,6 +168,9 @@
       },
       "heating_ratio": {
         "name": "Heating ratio"
+      },
+      "gas_today": {
+        "name": "Gas today"
       }
     },
     "binary_sensor": {

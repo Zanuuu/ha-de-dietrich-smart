@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import partial
-from typing import Any
 from zoneinfo import ZoneInfo
 
 from homeassistant.config_entries import ConfigEntry
@@ -18,6 +17,7 @@ from .bdr.cloud import BdrClient
 from .commands import CommandRunner
 from .coordinator import DeDietrichCoordinator
 from .devices import appliance_device_info
+from .energy import ConsumptionCoordinator
 from .journal import Journal
 
 PLATFORMS: list[Platform] = [
@@ -39,7 +39,7 @@ class RuntimeData:
     journal: Journal
     commands: CommandRunner
     device_id: str
-    consumption: Any = None
+    consumption: ConsumptionCoordinator
 
 
 type DeDietrichConfigEntry = ConfigEntry[RuntimeData]
@@ -69,9 +69,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -
     assert appliance is not None
     # Fiche de la chaudière enregistrée d'emblée : la zone et l'eau chaude s'y rattachent.
     device = dr.async_get(hass).async_get_or_create(config_entry_id=entry.entry_id, **appliance_device_info(appliance))
+    consumption = ConsumptionCoordinator(hass, entry, client, coordinator)
     entry.runtime_data = RuntimeData(
-        client=client, coordinator=coordinator, journal=journal, commands=commands, device_id=device.id
+        client=client,
+        coordinator=coordinator,
+        journal=journal,
+        commands=commands,
+        device_id=device.id,
+        consumption=consumption,
     )
+    # La consommation ne bloque pas le chargement : elle sera relue à l'heure suivante.
+    await consumption.async_refresh()
 
     @callback
     def _after_poll() -> None:

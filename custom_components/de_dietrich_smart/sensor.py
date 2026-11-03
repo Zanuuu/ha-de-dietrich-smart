@@ -13,7 +13,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
     SensorStateClass,
 )
-from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfPressure, UnitOfTemperature
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfEnergy, UnitOfPressure, UnitOfTemperature
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -150,7 +150,10 @@ async def async_setup_entry(
 ) -> None:
     data = entry.runtime_data.coordinator.data
     present = {"appliance": data.appliance, "zone": data.zone, "dhw": data.dhw}
-    async_add_entities(DDSensor(entry, d) for d in SENSORS if present[d.kind] is not None)
+    entities: list[SensorEntity] = [DDSensor(entry, d) for d in SENSORS if present[d.kind] is not None]
+    if data.appliance:
+        entities.append(GasTodaySensor(entry))
+    async_add_entities(entities)
 
 
 class DDSensor(DeDietrichEntity, SensorEntity):
@@ -181,3 +184,30 @@ class DDSensor(DeDietrichEntity, SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any] | None:
         fn = self.entity_description.attrs_fn
         return fn(self.coordinator.data) if fn and self.coordinator.data else None
+
+
+class GasTodaySensor(DeDietrichEntity, SensorEntity):
+    """Gaz consommé depuis minuit (chauffage + eau chaude), relu chaque heure.
+
+    Pour le tableau Énergie, utiliser les statistiques externes « Gaz chauffage » et
+    « Gaz eau chaude » : le cloud transmet les heures avec retard.
+    """
+
+    _attr_translation_key = "gas_today"
+    _attr_device_class = SensorDeviceClass.ENERGY
+    _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
+    _attr_state_class = SensorStateClass.TOTAL
+    _attr_suggested_display_precision = 0
+
+    def __init__(self, entry: DeDietrichConfigEntry) -> None:
+        super().__init__(entry, "appliance", "gas_today")
+        self.consumption = entry.runtime_data.consumption
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(self.consumption.async_add_listener(self.async_write_ha_state))
+
+    @property
+    def native_value(self) -> float | None:
+        data = self.consumption.data
+        return data.today_kwh if data else None

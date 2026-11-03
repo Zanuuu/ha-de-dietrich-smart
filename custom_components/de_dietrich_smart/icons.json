@@ -28,6 +28,9 @@
       },
       "heating_ratio": {
         "default": "mdi:percent-circle-outline"
+      },
+      "gas_today": {
+        "default": "mdi:fire"
       }
     },
     "binary_sensor": {
