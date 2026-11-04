@@ -56,10 +56,14 @@ Remeha Home apps.
 - **Repairs**: cloud unreachable, low water pressure, boiler fault, and a heating curve unsafe
   for floor heating connected directly to the boiler.
 
-## Installation (HACS)
+## Installation
 
-1. HACS → three-dot menu → **Custom repositories** → `https://github.com/Zanuuu/ha-de-dietrich-smart`,
-   category **Integration**.
+The repository is installed as a custom repository, from the Marketplace built into Home Assistant
+2026.11 (a GitHub connection is required to add it), or from HACS on Home Assistant 2026.10.
+
+1. Add `https://github.com/Zanuuu/ha-de-dietrich-smart`:
+   - Home Assistant 2026.11 or later: *Settings → Marketplace → Add from link*;
+   - Home Assistant 2026.10: HACS → three-dot menu → **Custom repositories**, category **Integration**.
 2. Install, then restart Home Assistant.
 3. *Settings → Devices & services → Add integration → De Dietrich Smart*, and sign in with the
    e-mail and password of the De Dietrich app.
