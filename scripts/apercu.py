@@ -7,6 +7,7 @@ débordements horizontaux, et sort en erreur s'il y en a.
 
 import os
 import sys
+from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
@@ -34,7 +35,10 @@ with sync_playwright() as pw:
             page.on("pageerror", lambda e: problems.append(f"page: {e}"))
             page.goto(f"{BASE}?theme={theme}")
             page.wait_for_selector("dd-smart-panel >> .week")
-            for tab in ("programs", "curve", "journal"):
+            for tab in ("programs", "curve", "conso", "journal"):
+                if tab == "conso":
+                    page.locator("dd-smart-panel >> nav button", has_text="Consommation").click()
+                    page.wait_for_selector("dd-smart-panel >> .tiles")
                 if tab == "curve":
                     page.locator("dd-smart-panel >> nav button", has_text="Courbe").click()
                     page.wait_for_selector("dd-smart-panel >> .chart svg polyline.prop")
@@ -62,6 +66,19 @@ with sync_playwright() as pw:
     page.screenshot(path=f"{OUT}/curve-history-mobile.png", full_page=True)
     if over := page.evaluate(OVERFLOW):
         problems.append(f"débordement simulation: {over}")
+    page.close()
+    # Export CSV : le navigateur reçoit le fichier, avec le BOM pour Excel.
+    page = browser.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=1, locale="fr-FR")
+    page.on("pageerror", lambda e: problems.append(f"page: {e}"))
+    page.goto(BASE)
+    page.wait_for_selector("dd-smart-panel >> .week")
+    page.locator("dd-smart-panel >> nav button", has_text="Consommation").click()
+    with page.expect_download() as dl:
+        page.locator("dd-smart-panel >> button", has_text="Jours (CSV)").click()
+    d = dl.value
+    content = Path(d.path()).read_bytes()
+    if d.suggested_filename != "de-dietrich-conso-jours-2026-11-04.csv" or not content.startswith(b"\xef\xbb\xbfJour;"):
+        problems.append(f"export CSV : {d.suggested_filename} {content[:20]!r}")
     page.close()
     # Courbe dangereuse pour le plancher : alerte et bascule proposée, puis confirmation.
     for width, height, size in ((390, 844, "mobile"), (1440, 960, "bureau")):

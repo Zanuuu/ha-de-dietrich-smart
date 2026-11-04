@@ -196,6 +196,9 @@
           "switch_to_floor": "Switch to a floor curve",
           "insufficient_data": "Not enough data"
         }
+      },
+      "heating_per_degree_day": {
+        "name": "Heating per degree day"
       }
     },
     "binary_sensor": {

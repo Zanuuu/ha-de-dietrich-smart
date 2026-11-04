@@ -13,7 +13,8 @@ Remeha Home apps.
 - **Sensors**: room and outdoor temperature, water pressure, boiler activity, error status and
   fault code (with the meaning and advice from the EMC-S manual), next switch, override end,
   heating ratio over the last hour, flow temperature from the heating curve, current setpoint
-  (kept as hourly statistics for the curve diagnosis), heating curve recommendation, gas used today.
+  (kept as hourly statistics for the curve diagnosis), heating curve recommendation, gas used today,
+  heating per degree day (kWh/DJU) over the last 30 days.
 - **Settings**: heating curve slope and base, setpoints of the five thermostat activities
   (Sleep, Home, Away, Morning, Evening), hot water setpoints, active program, fireplace mode.
 - **Energy dashboard**: hourly gas consumption for heating and hot water as external statistics
@@ -23,7 +24,7 @@ Remeha Home apps.
   (`Coût gaz chauffage`, `Coût gaz eau chaude`) with "Use an entity tracking the total costs".
   The whole history is computed at the current price.
 - **Sidebar panel** (French): weekly programs editable day by day, with copy to other days, a
-  **heating curve** tab, and a journal of events and commands. Any command can be undone within
+  **heating curve** tab, a **consumption** tab, and a journal of events and commands. Any command can be undone within
   2 minutes.
 - **Heating curve**: chart of the current curve, the proposed one and the zone forbidden to floor
   heating, adjustment with confirmation, and a **diagnosis** over the last 14 days of hourly
@@ -38,6 +39,12 @@ Remeha Home apps.
   proposed one (or the one being adjusted), hour by hour, for the forecast of the weather entity
   set in the options (hourly, else daily), or replayed over the last 7 days of recorded outdoor
   temperature. It does not predict room temperatures.
+- **Consumption and degree days** (consumption tab): yesterday, the current month and the heating
+  season (from 1 September) against the same period last year, raw and climate corrected (last
+  year's heating scaled to this year's degree days, base 18 °C, weather method), monthly totals,
+  and CSV exports of daily and hourly consumption (`;` separator, decimal comma). Daily outdoor
+  minimum and maximum come from the boiler outdoor sensor statistics once the recorder covers a
+  day, and before that from the free [Open-Meteo](https://open-meteo.com/) archive.
 - **Floor heating guard**: with floor heating connected directly, a curve outside the floor
   bounds (slope 0.2 to 1.0, base 15 to 35 °C, flow at the design outdoor temperature at most the
   maximum allowed flow temperature) is refused, from entities, services and the panel alike. A
@@ -80,6 +87,9 @@ Requires Home Assistant 2026.10 or later.
   the fault code itself: read it on the boiler display.
 - Without an outdoor sensor, the outdoor temperature comes from the cloud weather service.
 - Hourly consumption arrives late and in whole kWh.
+- Degree days for the past use Open-Meteo: the home coordinates, rounded to 0.01° (about 1 km),
+  are sent once for the last 400 days, then once a day for the recent days. The temperatures are
+  kept in `.storage`.
 - The curve diagnosis needs at least 3 days of statistics (7 for a high confidence), and a band
   only counts with 24 occupied hours: right after installation, and before the first frost for
   the cold band, it reports "not enough data". It judges on the thermostat only; room sensors

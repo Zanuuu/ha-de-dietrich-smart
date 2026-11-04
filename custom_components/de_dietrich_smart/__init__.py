@@ -19,6 +19,7 @@ from .commands import CommandRunner
 from .const import DOMAIN
 from .coordinator import DeDietrichCoordinator
 from .curve.coordinator import DiagnosticCoordinator
+from .curve.outdoor import OutdoorCoordinator
 from .devices import appliance_device_info
 from .energy import ConsumptionCoordinator
 from .http import client_factory, user_agent
@@ -48,6 +49,7 @@ class RuntimeData:
     device_id: str
     consumption: ConsumptionCoordinator
     diagnostic: DiagnosticCoordinator
+    outdoor: OutdoorCoordinator
 
 
 type DeDietrichConfigEntry = ConfigEntry[RuntimeData]
@@ -88,6 +90,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -
     device = dr.async_get(hass).async_get_or_create(config_entry_id=entry.entry_id, **appliance_device_info(appliance))
     consumption = ConsumptionCoordinator(hass, entry, client, coordinator)
     diagnostic = DiagnosticCoordinator(hass, entry, coordinator)
+    outdoor = OutdoorCoordinator(hass, entry, coordinator, consumption)
     entry.runtime_data = RuntimeData(
         client=client,
         coordinator=coordinator,
@@ -96,6 +99,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -
         device_id=device.id,
         consumption=consumption,
         diagnostic=diagnostic,
+        outdoor=outdoor,
     )
     await consumption.async_load()
     # La consommation ne bloque pas le chargement : elle sera relue à l'heure suivante.
@@ -106,6 +110,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -
     # Diagnostic de la courbe : lu dans l'enregistreur, un échec ne bloque pas le chargement.
     await diagnostic.async_refresh()
     entry.async_on_unload(diagnostic.async_add_listener(lambda: None))
+    # Températures journalières (DJU) : l'archive Open-Meteo est lue une fois, sans bloquer le chargement.
+    await outdoor.async_load()
+    await outdoor.async_refresh()
+    entry.async_on_unload(outdoor.async_add_listener(lambda: None))
+    entry.async_on_unload(outdoor.async_save)
 
     @callback
     def _on_data() -> None:
@@ -137,7 +146,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) 
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -> None:
-    """Intégration supprimée : alertes et fichiers .storage (journal, consommation) avec elle."""
+    """Intégration supprimée : alertes et fichiers .storage (journal, consommation, températures) avec elle."""
     async_delete_issues(hass, entry.entry_id)
-    for name in ("journal", "consumption"):
+    for name in ("journal", "consumption", "outdoor"):
         await Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.{name}").async_remove()

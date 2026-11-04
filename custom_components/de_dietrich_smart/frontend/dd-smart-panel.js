@@ -1,4 +1,5 @@
-// Panneau « Chaudière » de l'intégration De Dietrich Smart : programmes horaires, courbe de chauffe et journal.
+// Panneau « Chaudière » de l'intégration De Dietrich Smart : programmes horaires, courbe de chauffe,
+// consommation et journal.
 // Repris de l'interface de l'application ancienne application (mêmes règles et mêmes textes).
 // Aucune ressource externe : Lit est servi par l'intégration.
 import { LitElement, html, svg, css, nothing } from './lit-all.min.js';
@@ -61,6 +62,7 @@ function floorExcess(slope, base, maxFlow, g) {
   if (f > g.max_floor_flow) e += f - g.max_floor_flow;
   return e;
 }
+const nDays = (n) => `${n} jour${n > 1 ? 's' : ''}`;
 const fNum = (v, n = 2) => (v == null ? '—' : String(Math.round(v * 10 ** n) / 10 ** n).replace('.', ',').replace('-', '−'));
 const RECO = { keep: 'Garder la courbe', raise_base: 'Monter le pied', lower_base: 'Baisser le pied', raise_slope: 'Monter la pente',
   lower_slope: 'Baisser la pente', switch_to_floor: 'Passer à une courbe de plancher', insufficient_data: 'Données insuffisantes' };
@@ -90,6 +92,7 @@ class DdSmartPanel extends LitElement {
     _confirm: { state: true },
     _sim: { state: true },
     _simSource: { state: true },
+    _conso: { state: true },
   };
 
   constructor() {
@@ -112,6 +115,7 @@ class DdSmartPanel extends LitElement {
     this._confirm = null;
     this._sim = null;
     this._simSource = 'forecast';
+    this._conso = null;
   }
 
   connectedCallback() {
@@ -144,6 +148,7 @@ class DdSmartPanel extends LitElement {
       this._error = '';
       if (this._tab === 'journal') await this._loadJournal();
       if (this._tab === 'curve') await this._loadCurve();
+      if (this._tab === 'conso') await this._loadConso();
     } catch (e) {
       this._error = e.message || String(e);
     }
@@ -156,10 +161,36 @@ class DdSmartPanel extends LitElement {
     this._journal = await this._ws(msg);
   }
 
+  _loadTab(k) {
+    if (k === 'journal') this._loadJournal();
+    if (k === 'curve') this._loadCurve();
+    if (k === 'conso') this._loadConso();
+  }
+
   async _loadCurve() {
     if (!this._entryId) return;
     this._curve = await this._ws({ type: `${T}/curve`, entry_id: this._entryId });
     await this._loadSim();
+  }
+
+  async _loadConso() {
+    if (!this._entryId) return;
+    this._conso = await this._ws({ type: `${T}/consumption`, entry_id: this._entryId });
+  }
+
+  // Export CSV : fichier préparé par le serveur, enregistré par le navigateur (BOM pour Excel).
+  async _exportCsv(period) {
+    try {
+      const { filename, csv } = await this._ws({ type: `${T}/consumption_csv`, entry_id: this._entryId, period });
+      const url = URL.createObjectURL(new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      this._showToast(e.message || String(e), null, null, true);
+    }
   }
 
   async _loadSim() {
@@ -378,16 +409,17 @@ class DdSmartPanel extends LitElement {
           </select>` : nothing}
       </div>
       <nav class="tabs" role="tablist">
-        ${[['programs', 'Programmes'], ['curve', 'Courbe'], ['journal', 'Journal']].map(([k, l]) => html`
+        ${[['programs', 'Programmes'], ['curve', 'Courbe'], ['conso', 'Consommation'], ['journal', 'Journal']].map(([k, l]) => html`
           <button role="tab" aria-selected=${this._tab === k} class=${this._tab === k ? 'on' : ''}
-            @click=${() => { this._tab = k; if (k === 'journal') this._loadJournal(); if (k === 'curve') this._loadCurve(); }}>${l}</button>`)}
+            @click=${() => { this._tab = k; this._loadTab(k); }}>${l}</button>`)}
       </nav>
       <main>
         ${this._error ? html`<div class="card error">${this._error}</div>` : nothing}
         ${this._entries == null ? html`<div class="card muted">Chargement…</div>`
           : !this._entries.length ? html`<div class="card muted">Aucune chaudière configurée.</div>`
           : this._tab === 'programs' ? this._renderPrograms()
-          : this._tab === 'curve' ? this._renderCurve() : this._renderJournal()}
+          : this._tab === 'curve' ? this._renderCurve()
+          : this._tab === 'conso' ? this._renderConso() : this._renderJournal()}
       </main>
       ${this._editor ? this._renderEditor() : nothing}
       ${this._confirm ? this._renderConfirm() : nothing}
@@ -742,6 +774,59 @@ class DdSmartPanel extends LitElement {
     </dialog>`;
   }
 
+  _renderConso() {
+    const cs = this._conso;
+    if (!cs) return html`<div class="card muted">Chargement…</div>`;
+    const s = cs.summary, y = s.yesterday;
+    const kwh = (v) => (v == null ? '—' : `${fNum(v, 0)} kWh`);
+    const eur = (v) => (v == null ? '' : ` · ${fNum(v, 2)} €`);
+    const pct = (v) => (v == null ? '—' : `${v > 0 ? '+' : ''}${fNum(v, 0)} %`);
+    const cmp = (c, label) => html`<div class="tile">
+      <span class="tl">${label}</span>
+      <span class="tv">${kwh(c.total)}<span class="tu">${eur(c.cost)}</span></span>
+      ${c.last_year == null ? html`<span class="help">Pas de données l'an dernier.</span>` : html`
+        <span class="help">${pct(c.delta_pct)} sur l'an dernier (${kwh(c.last_year)})</span>
+        <span class="help">${c.delta_corrected_pct == null ? 'Correction climatique impossible (DJU manquants).'
+          : html`<b>${pct(c.delta_corrected_pct)}</b> à climat égal (${fNum(c.dju, 0)} DJU contre ${fNum(c.last_year_dju, 0)})`}</span>`}
+      ${c.days_last_year && c.days_last_year < c.days ? html`<span class="help">L'an dernier : ${c.days_last_year} jours connus sur ${c.days}.</span>` : nothing}
+    </div>`;
+    const src = cs.sources || {};
+    return html`
+      <section class="card">
+        <h2>Consommation de gaz</h2>
+        <div class="tiles">
+          <div class="tile"><span class="tl">Hier</span>
+            <span class="tv">${kwh(y?.total)}<span class="tu">${eur(y?.cost)}</span></span>
+            <span class="help">Chauffage ${kwh(y?.heating)}, eau chaude ${kwh(y?.dhw)}${y?.dju != null ? ` · ${fNum(y.dju, 1)} DJU` : ''}</span></div>
+          ${cmp(s.month, 'Mois en cours, jusqu\'à hier')}
+          ${cmp(s.season, `Saison ${s.season.label.replace('-', '–')}`)}
+          <div class="tile"><span class="tl">Chauffage par degré-jour, 30 jours</span>
+            <span class="tv">${s.kwh_per_dju_30d == null ? '—' : `${fNum(s.kwh_per_dju_30d, 2)} kWh/DJU`}</span>
+            <span class="help">${kwh(s.heating_30d)} pour ${fNum(s.dju_30d, 0)} DJU. Plus bas = moins de gaz à climat égal.</span></div>
+        </div>
+        <p class="help">DJU base ${cs.dju_base} °C (méthode météo). Températures : ${[src.ha ? `capteur de la chaudière (${nDays(src.ha)})` : '',
+          src['open-meteo'] ? `Open-Meteo (${nDays(src['open-meteo'])})` : ''].filter(Boolean).join(', ') || 'aucune pour l\'instant'}.</p>
+      </section>
+      <section class="card">
+        <h2>Par mois</h2>
+        <div class="tbl"><table>
+          <thead><tr><th>Mois</th><th>Chauffage</th><th>Eau chaude</th><th>Total</th>${cs.price ? html`<th>Coût</th>` : nothing}<th>DJU</th><th>kWh/DJU</th></tr></thead>
+          <tbody>${[...cs.months].reverse().map((m) => html`<tr>
+            <td>${new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${m.month}-15T12:00:00Z`))}</td>
+            <td>${kwh(m.heating)}</td><td>${kwh(m.dhw)}</td><td>${kwh(m.total)}</td>${cs.price ? html`<td>${m.cost == null ? '—' : `${fNum(m.cost, 0)} €`}</td>` : nothing}
+            <td>${m.dju == null ? '—' : fNum(m.dju, 0)}</td><td>${m.dju && m.heating != null ? fNum(m.heating / m.dju, 2) : '—'}</td></tr>`)}</tbody>
+        </table></div>
+      </section>
+      <section class="card">
+        <h2>Export</h2>
+        <p class="help">Fichiers CSV pour un tableur (séparateur « ; », virgule décimale). L'historique de chaque entité s'exporte aussi depuis l'Historique de Home Assistant.</p>
+        <div class="actions start">
+          <button class="primary" @click=${() => this._exportCsv('days')}>Jours (CSV)</button>
+          <button class="primary" @click=${() => this._exportCsv('hours')}>Heures (CSV)</button>
+        </div>
+      </section>`;
+  }
+
   _renderJournal() {
     const j = this._journal;
     return html`<section class="card">
@@ -797,8 +882,9 @@ class DdSmartPanel extends LitElement {
       color: var(--app-header-text-color, #fff); }
     .title { font-size: 20px; flex: 1; }
     .entry { font: inherit; border-radius: 8px; padding: 4px 8px; }
-    .tabs { display: flex; gap: 4px; padding: 8px 12px 0; border-bottom: 1px solid var(--divider-color); background: var(--card-background-color); }
-    .tabs button { font: inherit; background: none; border: 0; padding: 10px 14px; color: var(--secondary-text-color); border-bottom: 2px solid transparent; cursor: pointer; }
+    .tabs { display: flex; gap: 4px; padding: 8px 12px 0; border-bottom: 1px solid var(--divider-color); background: var(--card-background-color);
+      overflow-x: auto; scrollbar-width: none; }
+    .tabs button { flex: none; white-space: nowrap; font: inherit; background: none; border: 0; padding: 10px 14px; color: var(--secondary-text-color); border-bottom: 2px solid transparent; cursor: pointer; }
     .tabs button.on { color: var(--s); border-bottom-color: var(--s); font-weight: 500; }
     main { max-width: 960px; margin: 0 auto; padding: 16px; display: grid; gap: 16px; }
     .card { background: var(--card-background-color); border-radius: var(--ha-card-border-radius, var(--r)); padding: 16px;
@@ -912,7 +998,17 @@ class DdSmartPanel extends LitElement {
     th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--divider-color); white-space: nowrap; }
     th { font-weight: 500; color: var(--secondary-text-color); }
     tr.thin td { color: var(--secondary-text-color); }
+    .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 12px; }
+    .tile { display: flex; flex-direction: column; gap: 2px; padding: 12px; border-radius: 8px; background: color-mix(in srgb, var(--secondary-text-color) 6%, transparent); }
+    .tile .help { margin: 0; }
+    .tl { font-size: 13px; color: var(--secondary-text-color); }
+    .tv { font-size: 22px; font-weight: 500; font-variant-numeric: tabular-nums; }
+    .tu { font-size: 14px; font-weight: 400; color: var(--secondary-text-color); }
+    .actions.start { justify-content: flex-start; flex-wrap: wrap; }
+    td { font-variant-numeric: tabular-nums; }
     @media (max-width: 600px) {
+      .tabs { padding: 8px 4px 0; gap: 0; }
+      .tabs button { padding: 10px 10px; }
       main { padding: 12px; gap: 12px; }
       .card { padding: 12px; }
     }

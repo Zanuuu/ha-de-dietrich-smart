@@ -76,3 +76,23 @@ async def fetch_changes(
     return [
         (s.last_changed, s.state == STATE_ON) for s in states.get(entity_id, []) if s.state in (STATE_ON, STATE_OFF)
     ]
+
+
+async def fetch_min_max(
+    hass: HomeAssistant, entity_id: str | None, start: datetime, end: datetime
+) -> list[tuple[datetime, float, float]]:
+    """Mini et maxi horaires d'un capteur (statistiques de l'enregistreur)."""
+    if not entity_id:
+        return []
+    from homeassistant.components.recorder import get_instance
+    from homeassistant.components.recorder.statistics import statistics_during_period
+
+    rows = await get_instance(hass).async_add_executor_job(
+        statistics_during_period, hass, start, end, {entity_id}, "hour", None, {"min", "max"}
+    )
+    out = []
+    for r in rows.get(entity_id, []):
+        lo, hi = r.get("min"), r.get("max")
+        if lo is not None and hi is not None:
+            out.append((dt_util.utc_from_timestamp(r["start"]), lo, hi))
+    return out

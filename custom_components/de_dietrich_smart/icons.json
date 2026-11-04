@@ -37,6 +37,9 @@
       },
       "curve_recommendation": {
         "default": "mdi:chart-bell-curve-cumulative"
+      },
+      "heating_per_degree_day": {
+        "default": "mdi:home-thermometer-outline"
       }
     },
     "binary_sensor": {
