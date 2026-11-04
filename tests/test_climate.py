@@ -18,6 +18,8 @@ from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 
 from custom_components.de_dietrich_smart.bdr.models import SourceError
+from custom_components.de_dietrich_smart.climate import ZoneClimate
+from custom_components.de_dietrich_smart.water_heater import DhwWaterHeater
 
 from .conftest import push
 
@@ -109,3 +111,12 @@ async def test_command_error_is_translated(hass, loaded, mock_client):
         )
     assert err.value.translation_key == "command_failed"
     assert "HTTP 500" in err.value.translation_placeholders["message"]
+
+
+@pytest.mark.parametrize("cls", [ZoneClimate, DhwWaterHeater])
+def test_temperature_api_for_both_ha_generations(cls):
+    # HA 2026.11 n'avertit plus si la classe fournit les noms natifs ; HA 2026.10 ne lit que les anciens.
+    for name in ("temperature_unit", "current_temperature", "target_temperature"):
+        attr = f"_attr_{name}" if name == "temperature_unit" else name
+        native = f"_attr_native_{name}" if name == "temperature_unit" else f"native_{name}"
+        assert attr in vars(cls) and native in vars(cls)
