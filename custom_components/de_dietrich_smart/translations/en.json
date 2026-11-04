@@ -306,7 +306,7 @@
         },
         "switch_points": {
           "name": "Switch points",
-          "description": "List of {day: 0 = Sunday … 6, time: \"HH:MM\", activity: 1 to 5} (heating) or {day, time, comfort: true/false} (hot water)."
+          "description": "List of switch points. Heating: day (0 = Sunday … 6), time (\"HH:MM\"), activity (1 to 5). Hot water: day, time, comfort (true/false)."
         }
       }
     },
