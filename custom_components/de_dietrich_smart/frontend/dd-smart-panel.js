@@ -1,7 +1,7 @@
-// Panneau « Chaudière » de l'intégration De Dietrich Smart : programmes horaires et journal.
+// Panneau « Chaudière » de l'intégration De Dietrich Smart : programmes horaires, courbe de chauffe et journal.
 // Repris de l'interface de l'application ancienne application (mêmes règles et mêmes textes).
 // Aucune ressource externe : Lit est servi par l'intégration.
-import { LitElement, html, css, nothing } from './lit-all.min.js';
+import { LitElement, html, svg, css, nothing } from './lit-all.min.js';
 
 const T = 'de_dietrich_smart';
 // Jours du programme : 0 = dimanche (format du cloud) ; affichage du lundi au dimanche.
@@ -20,7 +20,7 @@ const DUR = { '1h': 'pendant 1 h', '2h': 'pendant 2 h', next: "jusqu'au prochain
 
 const spMin = (sp) => { const [h, m] = sp.time.split(':').map(Number); return h * 60 + m; };
 const hm = (min) => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
-const fDeg = (v) => (v == null ? '—' : `${String(Math.round(v * 10) / 10).replace('.', ',')} °C`);
+const fDeg = (v) => (v == null ? '—' : `${String(Math.round(v * 10) / 10).replace('.', ',').replace('-', '−')} °C`);
 const fShort = (v) => (v == null ? '?' : String(Math.round(v * 10) / 10).replace('.', ','));
 const daysLabel = (days = []) => (days.length === 7 ? 'toute la semaine'
   : WEEK_ORDER.filter((d) => days.includes(d)).map((d) => DAYS[d].toLowerCase()).join(', '));
@@ -45,6 +45,27 @@ function daySegments(week, day) {
   return segs;
 }
 
+// Courbe de chauffe : départ ≈ pied + pente × (20 − T ext), plafonné au départ maxi (approximation).
+const flowAt = (slope, base, outdoor, maxFlow) => {
+  const f = base + slope * (20 - outdoor);
+  return maxFlow == null ? f : Math.min(f, maxFlow);
+};
+// Dépassement des bornes du plancher (même calcul que le serveur) : 0 si la courbe est sûre.
+function floorExcess(slope, base, maxFlow, g) {
+  if (!g?.active) return 0;
+  const span = 20 - g.base_temp;
+  let e = 0;
+  if (slope < g.slope[0]) e += (g.slope[0] - slope) * span; else if (slope > g.slope[1]) e += (slope - g.slope[1]) * span;
+  if (base < g.base[0]) e += g.base[0] - base; else if (base > g.base[1]) e += base - g.base[1];
+  const f = flowAt(slope, base, g.base_temp, maxFlow);
+  if (f > g.max_floor_flow) e += f - g.max_floor_flow;
+  return e;
+}
+const fNum = (v, n = 2) => (v == null ? '—' : String(Math.round(v * 10 ** n) / 10 ** n).replace('.', ',').replace('-', '−'));
+const RECO = { keep: 'Garder la courbe', raise_base: 'Monter le pied', lower_base: 'Baisser le pied', raise_slope: 'Monter la pente',
+  lower_slope: 'Baisser la pente', switch_to_floor: 'Passer à une courbe de plancher', insufficient_data: 'Données insuffisantes' };
+const CONF = { high: 'confiance haute', medium: 'confiance moyenne', low: 'confiance basse' };
+
 // Intensité d'un créneau selon sa consigne (14 °C pâle, 28 °C soutenu).
 const intensity = (t) => (t == null ? 0 : Math.round(Math.max(0.1, Math.min(0.6, (t - 14) / 14)) * 100));
 
@@ -64,6 +85,9 @@ class DdSmartPanel extends LitElement {
     _jKind: { state: true },
     _error: { state: true },
     _now: { state: true },
+    _curve: { state: true },
+    _draft: { state: true },
+    _confirm: { state: true },
   };
 
   constructor() {
@@ -81,6 +105,9 @@ class DdSmartPanel extends LitElement {
     this._error = '';
     this._now = Date.now();
     this._lastLoad = 0;
+    this._curve = null;
+    this._draft = null;
+    this._confirm = null;
   }
 
   connectedCallback() {
@@ -112,6 +139,7 @@ class DdSmartPanel extends LitElement {
       if (!entries.some((e) => e.entry_id === this._entryId)) this._entryId = entries[0]?.entry_id;
       this._error = '';
       if (this._tab === 'journal') await this._loadJournal();
+      if (this._tab === 'curve') await this._loadCurve();
     } catch (e) {
       this._error = e.message || String(e);
     }
@@ -122,6 +150,11 @@ class DdSmartPanel extends LitElement {
     const msg = { type: `${T}/journal`, entry_id: this._entryId, limit: 100 };
     if (this._jKind) msg.kind = this._jKind;
     this._journal = await this._ws(msg);
+  }
+
+  async _loadCurve() {
+    if (!this._entryId) return;
+    this._curve = await this._ws({ type: `${T}/curve`, entry_id: this._entryId });
   }
 
   get _entry() { return this._entries?.find((e) => e.entry_id === this._entryId); }
@@ -194,6 +227,62 @@ class DdSmartPanel extends LitElement {
     }, 1200);
   }
 
+  // --- Courbe de chauffe -----------------------------------------------------
+
+  _curveBump(part, delta) {
+    const c = this._curve?.curve;
+    if (!c) return;
+    const d = this._draft ?? { slope: c.slope, base: c.base };
+    const step = part === 'slope' ? c.slope_step || 0.1 : c.base_step || 0.5;
+    const lo = part === 'slope' ? c.slope_min ?? 0 : c.base_min ?? 15;
+    const hi = part === 'slope' ? c.slope_max ?? 4 : c.base_max ?? 80;
+    const v = Math.min(hi, Math.max(lo, Math.round((d[part] + Math.sign(delta) * step) * 100) / 100));
+    this._draft = { ...d, [part]: v };
+  }
+
+  // Problème du brouillon pour le plancher ; une courbe moins dangereuse qu'aujourd'hui reste permise.
+  _draftProblem() {
+    const { curve: c, guard: g } = this._curve || {};
+    const d = this._draft;
+    if (!c || !d) return '';
+    const e = floorExcess(d.slope, d.base, c.max_flow, g);
+    if (!e) return '';
+    if (e < floorExcess(c.slope, c.base, c.max_flow, g)) return 'Toujours hors des bornes du plancher, mais moins qu\'aujourd\'hui.';
+    const f = flowAt(d.slope, d.base, g.base_temp, c.max_flow);
+    return f > g.max_floor_flow
+      ? `Départ de ${fNum(f, 1)} °C à ${fNum(g.base_temp, 0)} °C : au-delà des ${fNum(g.max_floor_flow, 0)} °C admis par le plancher.`
+      : `Hors des bornes du plancher (pente ${fNum(g.slope[0])} à ${fNum(g.slope[1])}, pied ${fNum(g.base[0], 0)} à ${fNum(g.base[1], 0)} °C).`;
+  }
+
+  _draftBlocked() {
+    const { curve: c, guard: g } = this._curve || {};
+    const d = this._draft;
+    if (!c || !d || (d.slope === c.slope && d.base === c.base)) return true;
+    const e = floorExcess(d.slope, d.base, c.max_flow, g);
+    return e > 0 && e >= floorExcess(c.slope, c.base, c.max_flow, g);
+  }
+
+  _openConfirm() {
+    this._confirm = { ...this._draft };
+    this.updateComplete.then(() => this.renderRoot.querySelector('dialog.confirm')?.showModal());
+  }
+
+  _closeConfirm() {
+    this.renderRoot.querySelector('dialog.confirm')?.close();
+    this._confirm = null;
+  }
+
+  async _applyCurve() {
+    const d = this._confirm;
+    this._closeConfirm();
+    const res = await this._command({ type: `${T}/set_heating_curve`, slope: d.slope, base: d.base });
+    if (!res) return;
+    this._draft = null;
+    // Affichage immédiat, sans attendre la relève du cloud.
+    this._curve = { ...this._curve, curve: { ...this._curve.curve, slope: d.slope, base: d.base } };
+    setTimeout(() => this._loadCurve(), 8000);
+  }
+
   // --- Éditeur d'un jour -----------------------------------------------------
 
   _openEditor(kind, day) {
@@ -203,11 +292,11 @@ class DdSmartPanel extends LitElement {
     if (!week) return;
     const rows = week.filter((sp) => sp.day === day).sort((a, b) => spMin(a) - spMin(b)).map((sp) => ({ ...sp }));
     this._editor = { kind, program, day, week, rows, copy: new Set() };
-    this.updateComplete.then(() => this.renderRoot.querySelector('dialog')?.showModal());
+    this.updateComplete.then(() => this.renderRoot.querySelector('dialog.editor')?.showModal());
   }
 
   _closeEditor() {
-    this.renderRoot.querySelector('dialog')?.close();
+    this.renderRoot.querySelector('dialog.editor')?.close();
     this._editor = null;
   }
 
@@ -279,17 +368,19 @@ class DdSmartPanel extends LitElement {
           </select>` : nothing}
       </div>
       <nav class="tabs" role="tablist">
-        ${[['programs', 'Programmes'], ['journal', 'Journal']].map(([k, l]) => html`
+        ${[['programs', 'Programmes'], ['curve', 'Courbe'], ['journal', 'Journal']].map(([k, l]) => html`
           <button role="tab" aria-selected=${this._tab === k} class=${this._tab === k ? 'on' : ''}
-            @click=${() => { this._tab = k; if (k === 'journal') this._loadJournal(); }}>${l}</button>`)}
+            @click=${() => { this._tab = k; if (k === 'journal') this._loadJournal(); if (k === 'curve') this._loadCurve(); }}>${l}</button>`)}
       </nav>
       <main>
         ${this._error ? html`<div class="card error">${this._error}</div>` : nothing}
         ${this._entries == null ? html`<div class="card muted">Chargement…</div>`
           : !this._entries.length ? html`<div class="card muted">Aucune chaudière configurée.</div>`
-          : this._tab === 'programs' ? this._renderPrograms() : this._renderJournal()}
+          : this._tab === 'programs' ? this._renderPrograms()
+          : this._tab === 'curve' ? this._renderCurve() : this._renderJournal()}
       </main>
       ${this._editor ? this._renderEditor() : nothing}
+      ${this._confirm ? this._renderConfirm() : nothing}
       ${this._toast ? html`
         <div class="toast ${this._toast.error ? 'err' : ''}" role="status">
           <span>${this._toast.text}</span>
@@ -400,7 +491,7 @@ class DdSmartPanel extends LitElement {
     const first = segs[0]?.sp;
     const firstName = first ? (dhw ? (first.comfort ? 'confort' : 'réduit') : A[first.activity]?.name ?? `Activité ${first.activity}`) : '';
     const dup = new Set(ed.rows.map((r) => r.time).filter((t, i, all) => t && all.indexOf(t) !== i));
-    return html`<dialog @close=${() => { this._editor = null; }} @cancel=${() => { this._editor = null; }}>
+    return html`<dialog class="editor" @close=${() => { this._editor = null; }} @cancel=${() => { this._editor = null; }}>
       <h3>${dhw ? `${DAYS[ed.day]}, eau chaude` : `${DAYS[ed.day]}, programme ${ed.program}`}</h3>
       <p class="help">${dhw ? 'Heures de passage en confort ou en température réduite.'
         : ed.program === this._zone?.program ? "Programme actif : la modification s'applique tout de suite au chauffage."
@@ -451,6 +542,124 @@ class DdSmartPanel extends LitElement {
         ${mins.sort((a, b) => a - b).map((x) => html`<option value=${x} ?selected=${x === m}>${String(x).padStart(2, '0')}</option>`)}
       </select>
     </span>`;
+  }
+
+  _renderCurve() {
+    const cv = this._curve;
+    if (!cv) return html`<div class="card muted">Chargement…</div>`;
+    const { curve: c, guard: g, now, diagnosis: dg } = cv;
+    if (!c) return html`<div class="card muted">Courbe de chauffe pas encore lue sur le cloud.</div>`;
+    const d = this._draft;
+    const shown = d ?? (dg && !['keep', 'insufficient_data'].includes(dg.action) ? { slope: dg.slope, base: dg.base } : null);
+    const problem = this._draftProblem();
+    const baseFlow = (s, b) => flowAt(s, b, g.base_temp, c.max_flow);
+    return html`
+      <section class="card">
+        <h2>Courbe de chauffe</h2>
+        <p class="sub"><span>Pente <b>${fNum(c.slope)}</b>, pied <b>${fNum(c.base, 1)} °C</b>${now?.flow != null
+          ? html` · départ estimé maintenant <b>${fDeg(now.flow)}</b> pour ${fDeg(now.outdoor)} dehors` : ''}</span></p>
+        ${g.violation ? html`<p class="warn" role="alert">Courbe dangereuse pour le plancher : ${g.violation}.</p>` : nothing}
+        ${this._curveChart(c, g, now, shown, d ? 'Réglage en cours' : 'Proposition du diagnostic')}
+        <p class="help">Approximation : la notice ne donne qu'un graphique, et l'influence de la sonde d'ambiance n'est pas connue.</p>
+      </section>
+      ${this._admin ? html`<section class="card">
+        <h2>Réglage</h2>
+        <ul class="acts">
+          ${[['slope', 'Pente', (v) => fNum(v)], ['base', 'Pied de courbe', (v) => `${fNum(v, 1)} °C`]].map(([k, l, f]) => html`<li>
+            <span class="lbl">${l}<span class="help">${d && d[k] !== c[k] ? `actuel : ${f(c[k])}` : ''}</span></span>
+            <span class="stepper">
+              <button aria-label="Baisser : ${l}" @click=${() => this._curveBump(k, -1)}>−</button>
+              <span class="v" aria-live="polite">${f((d ?? c)[k])}</span>
+              <button aria-label="Monter : ${l}" @click=${() => this._curveBump(k, 1)}>+</button>
+            </span></li>`)}
+        </ul>
+        <p class="help">Départ à ${fDeg(g.base_temp)} dehors : ${fDeg(baseFlow((d ?? c).slope, (d ?? c).base))}${g.active
+          ? ` (plancher : ${fDeg(g.max_floor_flow)} au plus)` : ''}.</p>
+        <p class="err" role="alert">${problem}</p>
+        <div class="actions">
+          <button class="ghost" ?disabled=${!d} @click=${() => { this._draft = null; }}>Rétablir</button>
+          <button class="primary" ?disabled=${this._draftBlocked()} @click=${() => this._openConfirm()}>Appliquer…</button>
+        </div>
+      </section>` : nothing}
+      ${this._renderDiagnosis(dg)}
+    `;
+  }
+
+  _curveChart(c, g, now, prop, propLabel) {
+    const W = this.narrow ? 360 : 640, H = this.narrow ? 260 : 300;
+    const L = 40, R = 10, TOP = 10, B = 34;
+    const flows = [flowAt(c.slope, c.base, -20, c.max_flow), prop ? flowAt(prop.slope, prop.base, -20, c.max_flow) : 0, g.max_floor_flow];
+    const yMax = Math.max(60, Math.ceil(Math.max(...flows) / 10) * 10), yMin = 10;
+    const x = (t) => L + ((20 - t) / 40) * (W - L - R);
+    const y = (v) => TOP + ((yMax - v) / (yMax - yMin)) * (H - TOP - B);
+    const line = (s, b) => Array.from({ length: 41 }, (_, i) => 20 - i).map((t) => `${x(t).toFixed(1)},${y(flowAt(s, b, t, c.max_flow)).toFixed(1)}`).join(' ');
+    const xs = [20, 10, 0, -10, -20], ys = [];
+    for (let v = yMin; v <= yMax; v += 10) ys.push(v);
+    const said = `Courbe actuelle : départ ${fDeg(flowAt(c.slope, c.base, 10, c.max_flow))} à 10 °C dehors, ${fDeg(flowAt(c.slope, c.base, 0, c.max_flow))} à 0 °C, ${fDeg(flowAt(c.slope, c.base, -10, c.max_flow))} à −10 °C.`;
+    return html`<figure class="chart">
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label=${said}>
+        <defs><pattern id="dd-hatch" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+          <rect width="3" height="8" class="hatch"></rect></pattern></defs>
+        ${g.active ? svg`<rect x=${L} y=${TOP} width=${W - L - R} height=${y(g.max_floor_flow) - TOP} fill="url(#dd-hatch)"></rect>
+          <line x1=${L} x2=${W - R} y1=${y(g.max_floor_flow)} y2=${y(g.max_floor_flow)} class="limit"></line>
+          <text x=${W - R - 4} y=${TOP + 14} text-anchor="end" class="lbl-err">Interdit au plancher (au-delà de ${fNum(g.max_floor_flow, 0)} °C)</text>` : nothing}
+        ${ys.map((v) => svg`<line x1=${L} x2=${W - R} y1=${y(v)} y2=${y(v)} class="grid"></line>
+          <text x=${L - 6} y=${y(v) + 4} text-anchor="end" class="tick">${v}</text>`)}
+        ${xs.map((t) => svg`<text x=${x(t)} y=${H - B + 16} text-anchor="middle" class="tick">${fNum(t, 0)}</text>`)}
+        <text x=${(L + W - R) / 2} y=${H - 4} text-anchor="middle" class="tick">Température extérieure (°C)</text>
+        <line x1=${x(g.base_temp)} x2=${x(g.base_temp)} y1=${TOP} y2=${H - B} class="base"></line>
+        <polyline points=${line(c.slope, c.base)} class="cur"></polyline>
+        ${prop ? svg`<polyline points=${line(prop.slope, prop.base)} class="prop"></polyline>` : nothing}
+        ${now?.flow != null ? svg`<circle cx=${x(Math.max(-20, Math.min(20, now.outdoor)))} cy=${y(now.flow)} r="5" class="pt"></circle>` : nothing}
+      </svg>
+      <figcaption class="legend">
+        <span><i class="k cur"></i>Actuelle (pente ${fNum(c.slope)}, pied ${fNum(c.base, 1)} °C)</span>
+        ${prop ? html`<span><i class="k prop"></i>${propLabel} (pente ${fNum(prop.slope)}, pied ${fNum(prop.base, 1)} °C)</span>` : nothing}
+        ${now?.flow != null ? html`<span><i class="k pt"></i>Maintenant</span>` : nothing}
+        <span><i class="k base"></i>Température de base (${fDeg(g.base_temp)})</span>
+      </figcaption>
+    </figure>`;
+  }
+
+  _renderDiagnosis(dg) {
+    if (!dg) return html`<section class="card"><h2>Diagnostic</h2><p class="muted">Pas encore calculé.</p></section>`;
+    const proposal = !['keep', 'insufficient_data'].includes(dg.action);
+    const usable = proposal && (dg.confidence !== 'low' || dg.action === 'switch_to_floor');
+    const B = dg.bands || {};
+    return html`<section class="card">
+      <div class="head"><h2>Diagnostic</h2>${dg.action === 'insufficient_data' ? nothing
+        : html`<span class="badge ${dg.confidence}">${CONF[dg.confidence]}</span>`}</div>
+      <p class="sub"><span><b>${RECO[dg.action] ?? dg.action}</b>${proposal ? ` : pente ${fNum(dg.slope)}, pied ${fNum(dg.base, 1)} °C` : ''}</span></p>
+      <ul class="reasons">${dg.reasons.map((r) => html`<li>${r}</li>`)}</ul>
+      ${dg.days ? html`<div class="tbl"><table>
+        <thead><tr><th>Bande</th><th>Heures occupées</th><th>Écart à la consigne</th><th>Part de chauffe</th><th>Remontée</th></tr></thead>
+        <tbody>${['mild', 'fresh', 'cold'].map((k) => { const b = B[k] || {}; return html`<tr class=${b.counted ? '' : 'thin'}>
+          <td>${b.label}</td><td>${b.occupied ?? 0}${b.counted ? '' : ' (trop peu)'}</td>
+          <td>${b.gap == null ? '—' : `${b.gap > 0 ? '+' : ''}${fNum(b.gap, 1)} °C`}</td>
+          <td>${b.ratio == null ? '—' : `${fNum(b.ratio, 0)} %`}</td>
+          <td>${b.recovery_h == null ? '—' : `${fNum(b.recovery_h, 1)} h`}</td></tr>`; })}</tbody>
+      </table></div>
+      <p class="help">${fNum(dg.days, 1)} jours de mesures sur les 14 derniers${dg.short_cycles_per_day != null
+        ? ` · ${fNum(dg.short_cycles_per_day, 1)} cycles courts par jour` : ''}. Heures occupées : en consigne de confort.</p>` : nothing}
+      ${proposal && this._admin ? html`<div class="actions">
+        ${usable ? html`<button class="primary" @click=${() => { this._draft = { slope: dg.slope, base: dg.base }; this._openConfirm(); }}>Appliquer la proposition…</button>`
+          : html`<p class="help">Confiance basse : attendez plus de mesures avant d'appliquer.</p>`}
+      </div>` : nothing}
+    </section>`;
+  }
+
+  _renderConfirm() {
+    const d = this._confirm, c = this._curve?.curve, g = this._curve?.guard;
+    return html`<dialog class="confirm" @close=${() => { this._confirm = null; }} @cancel=${() => { this._confirm = null; }}>
+      <h3>Changer la courbe de chauffe ?</h3>
+      <p>Pente ${fNum(c.slope)} → <b>${fNum(d.slope)}</b>, pied ${fNum(c.base, 1)} → <b>${fNum(d.base, 1)} °C</b>.</p>
+      <p class="help">Départ à ${fDeg(g.base_temp)} dehors : ${fDeg(flowAt(d.slope, d.base, g.base_temp, c.max_flow))}.
+        Le changement s'applique tout de suite à la chaudière ; il peut être annulé pendant 2 minutes.</p>
+      <div class="actions">
+        <button class="ghost" @click=${() => this._closeConfirm()}>Annuler</button>
+        <button class="primary" @click=${() => this._applyCurve()}>Appliquer</button>
+      </div>
+    </dialog>`;
   }
 
   _renderJournal() {
@@ -595,6 +804,33 @@ class DdSmartPanel extends LitElement {
     .toast.err { background: var(--error-color); color: #fff; }
     .toast button { font: inherit; font-weight: 600; background: none; border: 0; color: var(--s); cursor: pointer; text-transform: uppercase; }
     .toast.err button { color: #fff; }
+    .warn { color: var(--error-color); background: color-mix(in srgb, var(--error-color) 10%, transparent); padding: 8px 12px; border-radius: 8px; margin: 0 0 8px; }
+    .chart { margin: 8px 0 0; }
+    .chart svg { width: 100%; height: auto; display: block; }
+    .chart .grid { stroke: var(--divider-color); }
+    .chart .tick { fill: var(--secondary-text-color); font-size: 11px; }
+    .chart .hatch { fill: var(--error-color); opacity: 0.22; }
+    .chart .limit { stroke: var(--error-color); stroke-width: 1.5; }
+    .chart .lbl-err { fill: var(--error-color); font-size: 11px; paint-order: stroke; stroke: var(--card-background-color); stroke-width: 3px; }
+    .chart .base { stroke: var(--secondary-text-color); stroke-dasharray: 2 4; }
+    .chart .cur { fill: none; stroke: var(--s); stroke-width: 2.5; }
+    .chart .prop { fill: none; stroke: var(--warning-color, #ffa600); stroke-width: 2.5; stroke-dasharray: 7 5; }
+    .chart .pt { fill: var(--s); stroke: var(--card-background-color); stroke-width: 2; }
+    .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12px; color: var(--secondary-text-color); margin-top: 6px; }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .k { display: inline-block; width: 18px; height: 0; border-top: 2.5px solid var(--s); }
+    .k.prop { border-top: 2.5px dashed var(--warning-color, #ffa600); }
+    .k.pt { width: 10px; height: 10px; border: 0; border-radius: 50%; background: var(--s); }
+    .k.base { border-top: 1.5px dotted var(--secondary-text-color); }
+    .badge { font-size: 12px; border-radius: 999px; padding: 2px 10px; border: 1px solid var(--divider-color); color: var(--secondary-text-color); }
+    .badge.high { color: var(--success-color, #43a047); border-color: currentColor; }
+    .badge.medium { color: var(--warning-color, #ffa600); border-color: currentColor; }
+    .reasons { margin: 0 0 8px; padding-left: 20px; display: grid; gap: 4px; }
+    .tbl { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; }
+    th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--divider-color); white-space: nowrap; }
+    th { font-weight: 500; color: var(--secondary-text-color); }
+    tr.thin td { color: var(--secondary-text-color); }
     @media (max-width: 600px) {
       main { padding: 12px; gap: 12px; }
       .card { padding: 12px; }

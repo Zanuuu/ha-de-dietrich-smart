@@ -44,6 +44,23 @@
     commands: [{ id: 12, ts: now - 30, action: 'activite', params: { activity: 1, setpoint: 17.5, name: 'Nuit' }, ok: true, origin: 'Home Assistant', undone: false },
       { id: 11, ts: now - 4000, action: 'consigne', params: { setpoint: 19.5, duration: 'next' }, ok: true, origin: 'Home Assistant', undone: false },
       { id: 10, ts: now - 9000, action: 'programme', params: { program: 3 }, ok: false, error: 'HTTP 500', origin: 'Home Assistant', undone: false }] };
+  // ?case=switch : courbe d'origine (radiateurs) sur un plancher direct, bascule proposée.
+  const sw = q.get('case') === 'switch';
+  const bands = (mild, fresh, cold) => ({
+    mild: { label: 'douce (> 8 °C)', hours: 60, occupied: mild[0], gap: mild[1], ratio: mild[2], recovery_h: 1, counted: mild[0] >= 24 },
+    fresh: { label: 'fraîche (0 à 8 °C)', hours: 120, occupied: fresh[0], gap: fresh[1], ratio: fresh[2], recovery_h: 2, counted: fresh[0] >= 24 },
+    cold: { label: 'froide (< 0 °C)', hours: 6, occupied: cold[0], gap: cold[1], ratio: cold[2], recovery_h: null, counted: cold[0] >= 24 } });
+  const curve = {
+    curve: { slope: sw ? 1.5 : 0.5, slope_min: 0, slope_max: 4, slope_step: 0.1, base: sw ? 15 : 22, base_min: 15, base_max: 80, base_step: 0.5, max_flow: 80 },
+    guard: { active: true, slope: [0.2, 1], base: [15, 35], max_floor_flow: 45, base_temp: -15,
+      violation: sw ? 'pente 1,5 hors des bornes du plancher (0,2 à 1) ; départ de 67,5 °C à −15 °C, au-delà de 45 °C' : null },
+    now: { outdoor: 6, flow: sw ? 36 : 29 },
+    diagnosis: sw
+      ? { action: 'switch_to_floor', slope: 0.3, base: 33, confidence: 'high', days: 1.2, bands: bands([10, -0.2, 30], [9, 0.1, 40], [0, null, null]),
+        reasons: ['Courbe hors des bornes du plancher : pente 1,5 hors des bornes du plancher (0,2 à 1) ; départ de 67,5 °C à −15 °C, au-delà de 45 °C.',
+          "Bascule proposée une seule fois : même départ qu'aujourd'hui vers 5 °C dehors, puis de petits pas."], short_cycles_per_day: null }
+      : { action: 'raise_base', slope: 0.5, base: 23, confidence: 'medium', days: 5.5, bands: bands([18, -0.3, 22], [70, -0.8, 41], [4, -1.2, 63]),
+        reasons: ['Bande fraîche (0 à 8 °C) : 0,8 °C sous la consigne en moyenne sur 70 h occupées.'], short_cycles_per_day: 1.5 } };
   window.hass = {
     config: { time_zone: 'Europe/Paris' },
     // ?user=guest : compte non administrateur (lecture seule).
@@ -51,6 +68,7 @@
     callWS: async (msg) => {
       if (msg.type.endsWith('/overview')) return overview;
       if (msg.type.endsWith('/journal')) return journal;
+      if (msg.type.endsWith('/curve')) return curve;
       return { command_id: 13, message: 'Programme 2 modifié : lundi', undo_until: now + 120, undo_remaining: 120 };
     },
   };
