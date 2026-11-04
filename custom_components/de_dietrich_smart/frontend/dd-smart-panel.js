@@ -785,10 +785,10 @@ class DdSmartPanel extends LitElement {
       <span class="tl">${label}</span>
       <span class="tv">${kwh(c.total)}<span class="tu">${eur(c.cost)}</span></span>
       ${c.last_year == null ? html`<span class="help">Pas de données l'an dernier.</span>` : html`
-        <span class="help">${pct(c.delta_pct)} sur l'an dernier (${kwh(c.last_year)})</span>
+        <span class="help">${pct(c.delta_pct)} sur l'an dernier (${c.days_compared < c.days ? `${kwh(c.compared_total)} contre ` : ''}${kwh(c.last_year)})</span>
         <span class="help">${c.delta_corrected_pct == null ? 'Correction climatique impossible (DJU manquants).'
-          : html`<b>${pct(c.delta_corrected_pct)}</b> à climat égal (${fNum(c.dju, 0)} DJU contre ${fNum(c.last_year_dju, 0)})`}</span>`}
-      ${c.days_last_year && c.days_last_year < c.days ? html`<span class="help">L'an dernier : ${c.days_last_year} jours connus sur ${c.days}.</span>` : nothing}
+          : html`<b>${pct(c.delta_corrected_pct)}</b> à climat égal (${fNum(c.compared_dju, 0)} DJU contre ${fNum(c.last_year_dju, 0)})`}</span>
+        ${c.days_compared < c.days ? html`<span class="help">Comparé sur les ${c.days_compared} jours connus des deux côtés, sur ${c.days}.</span>` : nothing}`}
     </div>`;
     const src = cs.sources || {};
     return html`

@@ -100,11 +100,21 @@ def rows_provider(
 
 
 def compare(cur: list[dict[str, Any]], prev: list[dict[str, Any]], price: float | None) -> dict[str, Any]:
-    """Totaux de la période et de la même période un an plus tôt, avec et sans correction
-    climatique (le chauffage de l'an dernier ramené aux DJU de cette année)."""
-    c_total, p_total = _sum(cur, "total"), _sum(prev, "total")
-    c_dju, p_dju = _sum(cur, "dju"), _sum(prev, "dju")
-    p_heat, p_dhw = _sum(prev, "heating"), _sum(prev, "dhw")
+    """Totaux de la période et comparaison avec l'an dernier, avec et sans correction climatique
+    (le chauffage de l'an dernier ramené aux DJU de cette année).
+
+    La comparaison ne porte que sur les jours connus des deux côtés, appariés par mois et jour : un
+    historique plus court l'an dernier ne doit pas fausser l'écart. `total`, `cost` et `dju` restent
+    ceux de toute la période ; `compared_total` et `compared_dju` sont les valeurs comparées.
+    """
+    known = [r for r in cur if r["total"] is not None]
+    prev_by_day = {r["day"][5:]: r for r in prev if r["total"] is not None}
+    pairs = [(r, prev_by_day[r["day"][5:]]) for r in known if r["day"][5:] in prev_by_day]
+    climate = [(c, p) for c, p in pairs if c.get("dju") is not None and p.get("dju") is not None]
+    c_total, p_total = _sum([c for c, _ in pairs], "total"), _sum([p for _, p in pairs], "total")
+    c_clim = _sum([c for c, _ in climate], "total")
+    c_dju, p_dju = _sum([c for c, _ in climate], "dju"), _sum([p for _, p in climate], "dju")
+    p_heat, p_dhw = _sum([p for _, p in climate], "heating"), _sum([p for _, p in climate], "dhw")
     corrected = None
     if p_heat is not None and c_dju and p_dju:
         corrected = round(p_heat * c_dju / p_dju + (p_dhw or 0), 1)
@@ -112,17 +122,21 @@ def compare(cur: list[dict[str, Any]], prev: list[dict[str, Any]], price: float 
     def delta(a: float | None, b: float | None) -> int | None:
         return round((a - b) / b * 100) if a is not None and b else None
 
+    total = _sum(cur, "total")
     return {
-        "total": c_total,
-        "cost": round(c_total * price, 2) if c_total is not None and price else None,
-        "dju": c_dju,
+        "total": total,
+        "cost": round(total * price, 2) if total is not None and price else None,
+        "dju": _sum(cur, "dju"),
+        "compared_total": c_total,
+        "compared_dju": c_dju,
         "last_year": p_total,
         "last_year_dju": p_dju,
         "last_year_corrected": corrected,
         "delta_pct": delta(c_total, p_total),
-        "delta_corrected_pct": delta(c_total, corrected),
-        "days": sum(1 for r in cur if r["total"] is not None),
+        "delta_corrected_pct": delta(c_clim, corrected),
+        "days": len(known),
         "days_last_year": sum(1 for r in prev if r["total"] is not None),
+        "days_compared": len(pairs),
     }
 
 

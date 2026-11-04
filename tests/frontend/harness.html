@@ -74,15 +74,17 @@
     return { source, error: null, proposed: { slope: p.slope, base: p.base }, max_floor_flow: 45, guard_active: true, rows, days: [] };
   };
   // Consommation : chiffres proches de l'installation (novembre 2026 contre novembre 2025).
-  const cmpOf = (total, cost, dju, last, lastDju, corr, days) => ({ total, cost, dju, last_year: last, last_year_dju: lastDju,
-    last_year_corrected: corr, delta_pct: last ? Math.round((total - last) / last * 100) : null,
-    delta_corrected_pct: corr ? Math.round((total - corr) / corr * 100) : null, days, days_last_year: days });
+  // `partial` : historique plus court l'an dernier, comparaison sur les seuls jours connus des deux côtés.
+  const cmpOf = (total, cost, dju, last, lastDju, corr, days, partial) => { const cTotal = partial?.total ?? total, cDju = partial?.dju ?? dju, cDays = partial?.days ?? days;
+    return { total, cost, dju, compared_total: cTotal, compared_dju: cDju, last_year: last, last_year_dju: lastDju,
+    last_year_corrected: corr, delta_pct: last ? Math.round((cTotal - last) / last * 100) : null,
+    delta_corrected_pct: corr ? Math.round((cTotal - corr) / corr * 100) : null, days, days_last_year: cDays, days_compared: cDays }; };
   const months = ['2025-11', '2025-12', '2026-01', '2026-02', '2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11']
     .map((month, i) => { const d = [330, 450, 520, 430, 360, 220, 90, 20, 0, 0, 40, 210, 30][i];
       const heating = Math.round(d * 2.6), dhw = 95; return { month, heating, dhw, total: heating + dhw, cost: (heating + dhw) * 0.15, dju: d, days: 30 }; });
   const conso = { price: 0.15, dju_base: 18, sources: { 'open-meteo': 397, ha: 1 }, months,
     summary: { yesterday: { total: 46, heating: 43, dhw: 3, cost: 7.34, dju: 13.2, outdoor: 4.8 },
-      month: cmpOf(132, 21.05, 38.5, 118, 31.2, 140.1, 3), season: { ...cmpOf(842, 134.3, 301, 905, 288, 942, 64), label: '2026-2027' },
+      month: cmpOf(132, 21.05, 38.5, 118, 31.2, 140.1, 3), season: { ...cmpOf(842, 134.3, 301, 905, 288, 830, 64, { total: 790, dju: 275, days: 35 }), label: '2026-2027' },
       kwh_per_dju_30d: 2.71, heating_30d: 702, dju_30d: 259, dju_base: 18 } };
   window.hass = {
     config: { time_zone: 'Europe/Paris' },

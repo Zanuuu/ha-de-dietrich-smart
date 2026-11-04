@@ -76,6 +76,42 @@ def test_compare_without_last_year():
     assert c["last_year"] is None and c["last_year_corrected"] is None and c["delta_pct"] is None
 
 
+def test_compare_only_on_days_known_both_years():
+    """Cas réel de la saison 2026-2027 : l'historique de l'an dernier ne couvre pas tout septembre."""
+    cur = [row("2026-09-01", 0.0, 2.0, 50.0), row("2026-10-01", 100.0, 10.0, 200.0)]
+    prev = [row("2025-10-01", 120.0, 10.0, 300.0)]
+    c = compare(cur, prev, price=0.1)
+    # Le total et le coût restent ceux de la période ; l'écart ne compte que le 1er octobre.
+    assert (c["total"], c["cost"], c["dju"]) == (112.0, 11.2, 250.0)
+    assert (c["compared_total"], c["compared_dju"], c["last_year"], c["last_year_dju"]) == (110.0, 200.0, 130.0, 300.0)
+    assert (c["delta_pct"], c["last_year_corrected"], c["delta_corrected_pct"]) == (-15, 90.0, 22)
+    assert (c["days"], c["days_last_year"], c["days_compared"]) == (2, 1, 1)
+
+
+def test_compare_ignores_a_day_missing_this_year():
+    empty = {**row("2026-10-02", 0.0, 0.0, 5.0), "heating": None, "dhw": None, "total": None}
+    prev = [row("2025-10-01", 20.0, 1.0, 5.0), row("2025-10-02", 90.0, 1.0, 5.0)]
+    c = compare([row("2026-10-01", 10.0, 1.0, 5.0), empty], prev, None)
+    assert (c["compared_total"], c["last_year"], c["delta_pct"]) == (11.0, 21.0, -48)
+    assert (c["days"], c["days_last_year"], c["days_compared"]) == (1, 2, 1)
+
+
+def test_compare_correction_skips_days_without_dju_on_either_side():
+    cur = [row("2026-10-01", 10.0, 0.0, 5.0), row("2026-10-02", 50.0, 0.0, None)]
+    prev = [row("2025-10-01", 20.0, 0.0, 5.0), row("2025-10-02", 60.0, 0.0, 5.0)]
+    c = compare(cur, prev, None)
+    assert (c["compared_total"], c["last_year"], c["delta_pct"]) == (60.0, 80.0, -25)
+    # À climat égal : seul le 1er octobre a ses DJU des deux côtés, 10 contre 20.
+    assert (c["compared_dju"], c["last_year_dju"]) == (5.0, 5.0)
+    assert (c["last_year_corrected"], c["delta_corrected_pct"]) == (20.0, -50)
+
+
+def test_compare_29_february_has_no_match():
+    cur = [row("2028-02-28", 10.0, 0.0, 5.0), row("2028-02-29", 99.0, 0.0, 5.0)]
+    c = compare(cur, [row("2027-02-28", 20.0, 0.0, 5.0)], None)
+    assert (c["compared_total"], c["last_year"], c["days_compared"], c["days"]) == (10.0, 20.0, 1, 2)
+
+
 def test_kwh_per_dju():
     rows = [row(f"2026-10-{d:02d}", 30.0, 2.0, 10.0) for d in range(1, 31)]
     assert kwh_per_dju(rows) == (3.0, 900.0, 300.0)
