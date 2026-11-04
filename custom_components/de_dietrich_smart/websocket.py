@@ -1,4 +1,4 @@
-"""API WebSocket du panneau latéral : état, journal, créneaux, activités, annulation."""
+"""API WebSocket du panneau latéral : état, journal, créneaux, activités, courbe, annulation."""
 
 from __future__ import annotations
 
@@ -12,7 +12,8 @@ from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
 
 from .commands import CommandError, CommandResult
-from .const import DOMAIN, UNDO_WINDOW
+from .const import CONF_BASE_TEMP, CONF_MAX_FLOOR_FLOW, DEFAULT_OPTIONS, DOMAIN, FLOOR_BASE, FLOOR_SLOPE, UNDO_WINDOW
+from .curve import curve_flow, floor_violation, guard_active
 
 if TYPE_CHECKING:
     from . import DeDietrichConfigEntry
@@ -166,7 +167,66 @@ async def ws_undo(hass: HomeAssistant, connection: websocket_api.ActiveConnectio
         await _send(connection, msg, entry.runtime_data.commands.undo(msg["command_id"]))
 
 
+@websocket_api.websocket_command({probatio.Required("type"): f"{T}/curve", probatio.Required("entry_id"): str})
+@callback
+def ws_curve(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Courbe, bornes du plancher, point du moment et diagnostic."""
+    if not (entry := _entry(hass, connection, msg)):
+        return
+    rt = entry.runtime_data
+    state = rt.coordinator.data
+    curve = state.zone.heating_curve if state and state.zone else None
+    opts = {**DEFAULT_OPTIONS, **entry.options}
+    outdoor = state.appliance.outdoor_temp if state and state.appliance else None
+    flow = curve_flow(curve, outdoor) if outdoor is not None else None
+    violation = (
+        floor_violation(curve["slope"], curve["base"], curve.get("max_flow"), opts)
+        if curve and curve.get("slope") is not None and curve.get("base") is not None
+        else None
+    )
+    connection.send_result(
+        msg["id"],
+        {
+            "curve": curve,
+            "guard": {
+                "active": guard_active(opts),
+                "slope": list(FLOOR_SLOPE),
+                "base": list(FLOOR_BASE),
+                "max_floor_flow": float(opts[CONF_MAX_FLOOR_FLOW]),
+                "base_temp": float(opts[CONF_BASE_TEMP]),
+                "violation": violation,
+            },
+            "now": {"outdoor": outdoor, "flow": round(flow, 1) if flow is not None else None},
+            "diagnosis": rt.diagnostic.data.as_dict() if rt.diagnostic.data else None,
+        },
+    )
+
+
+@websocket_api.websocket_command(
+    {
+        probatio.Required("type"): f"{T}/set_heating_curve",
+        probatio.Required("entry_id"): str,
+        probatio.Required("slope"): probatio.Coerce(float),
+        probatio.Required("base"): probatio.Coerce(float),
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_set_heating_curve(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    if entry := _entry(hass, connection, msg):
+        await _send(connection, msg, entry.runtime_data.commands.set_heating_curve(msg["slope"], msg["base"]))
+
+
 @callback
 def async_setup_websocket(hass: HomeAssistant) -> None:
-    for handler in (ws_overview, ws_journal, ws_set_week, ws_set_dhw_week, ws_set_activity, ws_undo):
+    for handler in (
+        ws_overview,
+        ws_journal,
+        ws_set_week,
+        ws_set_dhw_week,
+        ws_set_activity,
+        ws_curve,
+        ws_set_heating_curve,
+        ws_undo,
+    ):
         websocket_api.async_register_command(hass, handler)

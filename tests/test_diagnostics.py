@@ -17,3 +17,5 @@ async def test_diagnostics_redacted(hass, config_entry, mock_client, dashboard):
     # Identifiants d'appareil remplacés par des pseudonymes.
     assert "a1b2c3" not in text and not re.search(r'"(z1|h1)"', text)
     assert diag["state"]["appliances"][0]["zones"][0]["setpoint"] == 21.0
+    # Diagnostic de la courbe joint (pas d'identifiant dedans).
+    assert diag["curve_diagnosis"]["action"] == "switch_to_floor"

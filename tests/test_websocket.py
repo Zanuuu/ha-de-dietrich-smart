@@ -104,3 +104,39 @@ async def test_panel_reregistered_after_reload(hass, config_entry, mock_client):
         assert await hass.config_entries.async_reload(config_entry.entry_id)
         await hass.async_block_till_done()
         assert register.await_count == 2 and static.await_count == 1
+
+
+async def test_ws_curve(hass, loaded, config_entry, hass_ws_client):
+    client = await hass_ws_client(hass)
+    res = await ws(client, 1, type=f"{T}/curve", entry_id=config_entry.entry_id)
+    assert res["success"]
+    r = res["result"]
+    assert r["curve"]["slope"] == 1.5 and r["curve"]["base"] == 15.0
+    assert r["guard"] == {
+        "active": True, "slope": [0.2, 1.0], "base": [15.0, 35.0], "max_floor_flow": 45.0, "base_temp": -15.0,
+        "violation": r["guard"]["violation"],
+    }  # fmt: skip
+    assert "pente 1,5" in r["guard"]["violation"]
+    # Point du moment : 6 °C dehors, 15 + 1,5 × 14 = 36 °C.
+    assert r["now"] == {"outdoor": 6.0, "flow": 36.0}
+    assert r["diagnosis"]["action"] == "switch_to_floor" and r["diagnosis"]["slope"] == 0.3
+
+
+async def test_ws_set_heating_curve(hass, loaded, config_entry, hass_ws_client, mock_client):
+    client = await hass_ws_client(hass)
+    res = await ws(client, 1, type=f"{T}/set_heating_curve", entry_id=config_entry.entry_id, slope=1.5, base=22)
+    assert not res["success"] and res["error"]["code"] == "command_failed"
+    assert "courbe refusée pour le plancher" in res["error"]["message"]
+    res = await ws(client, 2, type=f"{T}/set_heating_curve", entry_id=config_entry.entry_id, slope=0.3, base=33)
+    assert res["success"] and 119 <= res["result"]["undo_remaining"] <= 120
+    mock_client.zone_heating_curve.assert_awaited_once_with("z1", 0.3, 33.0)
+
+
+async def test_ws_set_heating_curve_requires_admin(
+    hass, loaded, config_entry, hass_ws_client, hass_read_only_access_token
+):
+    client = await hass_ws_client(hass, hass_read_only_access_token)
+    res = await ws(client, 1, type=f"{T}/set_heating_curve", entry_id=config_entry.entry_id, slope=0.3, base=33)
+    assert not res["success"] and res["error"]["code"] == "unauthorized"
+    res = await ws(client, 2, type=f"{T}/curve", entry_id=config_entry.entry_id)
+    assert res["success"]

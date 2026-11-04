@@ -5,6 +5,7 @@ from datetime import timedelta
 
 import pytest
 from homeassistant.const import ATTR_ENTITY_ID, STATE_OFF, STATE_ON, STATE_UNAVAILABLE
+from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
 
 from .conftest import push
@@ -18,6 +19,10 @@ def st(hass, entity_id):
 
 async def test_sensors(hass, loaded):
     assert st(hass, "sensor.salon_room_temperature").state == "19.4"
+    # Consigne en capteur : ses moyennes horaires alimentent le diagnostic de la courbe.
+    target = st(hass, "sensor.salon_setpoint")
+    assert target.state == str(loaded.coordinator.data.zone.setpoint)
+    assert target.attributes["state_class"] == "measurement" and target.attributes["unit_of_measurement"] == "°C"
     out = st(hass, "sensor.maison_exemple_outdoor_temperature")
     assert out.state == "6.0" and out.attributes["source"] == "météo"
     assert st(hass, "sensor.maison_exemple_water_pressure").state == "1.6"
@@ -72,7 +77,11 @@ async def test_heating_ratio(hass, loaded, state, freezer):
     assert st(hass, "sensor.salon_heating_ratio").state == "0"
 
 
-async def test_curve_numbers_write(hass, loaded, mock_client):
+async def test_curve_numbers_write(hass, config_entry, mock_client):
+    # Radiateurs : bornes du cloud, sans garde-fou du plancher.
+    hass.config_entries.async_update_entry(config_entry, options={"emitter": "radiators"})
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
     slope = st(hass, "number.salon_heating_curve_slope")
     assert slope.state == "1.5" and slope.attributes["min"] == 0.0 and slope.attributes["max"] == 4.0
     assert slope.attributes["step"] == 0.1
@@ -84,6 +93,19 @@ async def test_curve_numbers_write(hass, loaded, mock_client):
         "number", "set_value", {ATTR_ENTITY_ID: "number.salon_heating_curve_base", "value": 22}, blocking=True
     )
     mock_client.zone_heating_curve.assert_awaited_with("z1", 1.5, 22.0)
+
+
+async def test_curve_numbers_floor_bounds(hass, loaded, mock_client):
+    # Plancher direct : bornes resserrées à celles du plancher, dans la limite de celles du cloud.
+    slope = st(hass, "number.salon_heating_curve_slope")
+    assert slope.attributes["min"] == 0.2 and slope.attributes["max"] == 1.0
+    base = st(hass, "number.salon_heating_curve_base")
+    assert base.attributes["min"] == 15.0 and base.attributes["max"] == 35.0
+    with pytest.raises(ServiceValidationError, match="courbe refusée pour le plancher"):
+        await hass.services.async_call(
+            "number", "set_value", {ATTR_ENTITY_ID: base.entity_id, "value": 22}, blocking=True
+        )
+    mock_client.zone_heating_curve.assert_not_awaited()
 
 
 async def test_activity_numbers(hass, loaded, mock_client):

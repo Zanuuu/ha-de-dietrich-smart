@@ -197,3 +197,51 @@ async def test_failed_return_is_retried(hass, rt, mock_client, state, freezer):
     mock_client.zone_schedule.side_effect = None
     await rt.commands.async_run_pending()
     assert mock_client.zone_schedule.await_count == 2 and rt.journal.pendings() == []
+
+
+# --- Garde-fou du plancher (M12) --------------------------------------------
+# Courbe du fixture : pente 1,5, pied 15 (67,5 °C à −15 °C), dangereuse pour un plancher direct.
+
+
+async def test_floor_guard_refuses_worse_curve(rt, mock_client):
+    # Pied seul relevé : plus dangereux qu'aujourd'hui.
+    with pytest.raises(CommandError, match="courbe refusée pour le plancher"):
+        await rt.commands.set_heating_curve(None, 22.0)
+    mock_client.zone_heating_curve.assert_not_awaited()
+    assert rt.journal.commands(10) == []
+
+
+async def test_floor_guard_accepts_step_toward_safety(rt, mock_client):
+    # 1,2 reste hors bornes, mais rapproche de la sécurité : accepté pour pouvoir corriger pas à pas.
+    await rt.commands.set_heating_curve(1.2, None)
+    mock_client.zone_heating_curve.assert_awaited_once_with("z1", 1.2, 15.0)
+
+
+async def test_floor_guard_refuses_leaving_safe_curve(hass, rt, mock_client, state):
+    safe = copy.deepcopy(state)
+    safe.zone.heating_curve = {**safe.zone.heating_curve, "slope": 0.5, "base": 22.0}
+    rt.coordinator.async_set_updated_data(safe)
+    with pytest.raises(CommandError, match="pente 1,2 hors des bornes du plancher"):
+        await rt.commands.set_heating_curve(1.2, None)
+    with pytest.raises(CommandError, match="pied 36 °C hors des bornes du plancher"):
+        await rt.commands.set_heating_curve(0.2, 36.0)
+    with pytest.raises(CommandError, match="départ de 52 °C"):
+        await rt.commands.set_heating_curve(0.8, 24.0)
+    await rt.commands.set_heating_curve(0.6, 21.0)
+    mock_client.zone_heating_curve.assert_awaited_once_with("z1", 0.6, 21.0)
+
+
+async def test_floor_guard_off_for_radiators(hass, config_entry, mock_client):
+    hass.config_entries.async_update_entry(config_entry, options={"emitter": "radiators"})
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    await config_entry.runtime_data.commands.set_heating_curve(1.5, 40.0)
+    mock_client.zone_heating_curve.assert_awaited_once_with("z1", 1.5, 40.0)
+
+
+async def test_undo_restores_unsafe_curve(rt, mock_client, freezer):
+    # L'annulation rétablit la courbe précédente telle quelle, même hors bornes.
+    freezer.move_to("2026-11-04 10:00:00+00:00")
+    res = await rt.commands.set_heating_curve(0.5, 22.0)
+    await rt.commands.undo(res.command_id)
+    mock_client.zone_heating_curve.assert_awaited_with("z1", 1.5, 15.0)

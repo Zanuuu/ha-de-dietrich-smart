@@ -31,6 +31,12 @@
       },
       "gas_today": {
         "default": "mdi:fire"
+      },
+      "target_temperature": {
+        "default": "mdi:thermometer-check"
+      },
+      "curve_recommendation": {
+        "default": "mdi:chart-bell-curve-cumulative"
       }
     },
     "binary_sensor": {

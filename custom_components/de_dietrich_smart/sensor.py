@@ -22,6 +22,7 @@ from . import DeDietrichConfigEntry
 from .bdr.models import State
 from .coordinator import DeDietrichCoordinator
 from .curve import curve_flow
+from .curve.diagnostic import ACTIONS
 from .energy import today_kwh
 from .entity import DeDietrichEntity, Kind
 from .faults import describe
@@ -63,6 +64,16 @@ SENSORS: tuple[DDSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfTemperature.CELSIUS,
         value_fn=lambda s: s.zone.room_temp if s.zone else None,
         unavailable_when_none=True,
+    ),
+    # Consigne en vigueur : capteur pour que l'enregistreur en garde les moyennes horaires (diagnostic).
+    DDSensorDescription(
+        key="target_temperature",
+        translation_key="target_temperature",
+        kind="zone",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        value_fn=lambda s: s.zone.setpoint if s.zone else None,
     ),
     DDSensorDescription(
         key="outdoor_temperature",
@@ -155,6 +166,8 @@ async def async_setup_entry(
     entities: list[SensorEntity] = [DDSensor(entry, d) for d in SENSORS if present[d.kind] is not None]
     if data.appliance:
         entities.append(GasTodaySensor(entry))
+    if data.zone:
+        entities.append(CurveRecommendationSensor(entry))
     async_add_entities(entities)
 
 
@@ -218,3 +231,35 @@ class GasTodaySensor(DeDietrichEntity, SensorEntity):
     @property
     def last_reset(self) -> datetime:
         return dt_util.start_of_local_day()
+
+
+class CurveRecommendationSensor(DeDietrichEntity, SensorEntity):
+    """Recommandation du diagnostic de la courbe, avec la courbe proposée, les raisons et la confiance."""
+
+    _attr_translation_key = "curve_recommendation"
+    _attr_device_class = SensorDeviceClass.ENUM
+    _attr_options = list(ACTIONS)
+
+    def __init__(self, entry: DeDietrichConfigEntry) -> None:
+        super().__init__(entry, "zone", "curve_recommendation")
+        self.diagnostic = entry.runtime_data.diagnostic
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(self.diagnostic.async_add_listener(self.async_write_ha_state))
+
+    @property
+    def available(self) -> bool:
+        return super().available and self.diagnostic.last_update_success and self.diagnostic.data is not None
+
+    @property
+    def native_value(self) -> str | None:
+        d = self.diagnostic.data
+        return d.action if d else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any] | None:
+        d = self.diagnostic.data
+        if not d:
+            return None
+        return {"slope": d.slope, "base": d.base, "confidence": d.confidence, "reasons": d.reasons, "days": d.days}

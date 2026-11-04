@@ -34,7 +34,10 @@ with sync_playwright() as pw:
             page.on("pageerror", lambda e: problems.append(f"page: {e}"))
             page.goto(f"{BASE}?theme={theme}")
             page.wait_for_selector("dd-smart-panel >> .week")
-            for tab in ("programs", "journal"):
+            for tab in ("programs", "curve", "journal"):
+                if tab == "curve":
+                    page.locator("dd-smart-panel >> nav button", has_text="Courbe").click()
+                    page.wait_for_selector("dd-smart-panel >> .chart svg polyline.prop")
                 if tab == "journal":
                     page.locator("dd-smart-panel >> nav button", has_text="Journal").click()
                     page.wait_for_selector("dd-smart-panel >> .journal li")
@@ -47,6 +50,22 @@ with sync_playwright() as pw:
                 page.wait_for_selector("dd-smart-panel >> dialog[open]")
                 page.screenshot(path=f"{OUT}/editor-{size}-{theme}.png")
             page.close()
+    # Courbe dangereuse pour le plancher : alerte et bascule proposée, puis confirmation.
+    for width, height, size in ((390, 844, "mobile"), (1440, 960, "bureau")):
+        page = browser.new_page(viewport={"width": width, "height": height}, device_scale_factor=1, locale="fr-FR")
+        page.on("console", lambda m: m.type == "error" and problems.append(f"console: {m.text}"))
+        page.on("pageerror", lambda e: problems.append(f"page: {e}"))
+        page.goto(f"{BASE}?case=switch")
+        page.wait_for_selector("dd-smart-panel >> .week")
+        page.locator("dd-smart-panel >> nav button", has_text="Courbe").click()
+        page.wait_for_selector("dd-smart-panel >> .warn")
+        page.screenshot(path=f"{OUT}/curve-switch-{size}.png", full_page=True)
+        if over := page.evaluate(OVERFLOW):
+            problems.append(f"débordement courbe bascule {size}: {over}")
+        page.locator("dd-smart-panel >> button", has_text="Appliquer la proposition").click()
+        page.wait_for_selector("dd-smart-panel >> dialog.confirm[open]")
+        page.screenshot(path=f"{OUT}/curve-confirm-{size}.png")
+        page.close()
     # Compte non administrateur : aucun bouton d'écriture (le serveur les refuserait).
     page = browser.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=1, locale="fr-FR")
     page.on("pageerror", lambda e: problems.append(f"page: {e}"))
@@ -63,6 +82,11 @@ with sync_playwright() as pw:
     page.wait_for_selector("dd-smart-panel >> .journal li")
     if n := page.locator("dd-smart-panel >> .journal button.link").count():
         problems.append(f"non-admin : {n} liens « Annuler » visibles")
+    page.locator("dd-smart-panel >> nav button", has_text="Courbe").click()
+    page.wait_for_selector("dd-smart-panel >> .chart svg")
+    if n := page.locator("dd-smart-panel >> .stepper button, dd-smart-panel >> .actions button").count():
+        problems.append(f"non-admin : {n} boutons de réglage de la courbe visibles")
+    page.screenshot(path=f"{OUT}/curve-mobile-guest.png", full_page=True)
     page.close()
     browser.close()
 
