@@ -27,6 +27,8 @@ async def async_setup_entry(
 class ZoneClimate(DeDietrichEntity, ClimateEntity):
     _attr_name = None
     _attr_translation_key = "zone"
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
+    # Anciens noms pour HA 2026.10 : à retirer quand la version minimale passera à 2026.11.
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_target_temperature_step = 0.5
     _attr_hvac_modes = [HVACMode.HEAT, HVACMode.OFF]
@@ -42,12 +44,15 @@ class ZoneClimate(DeDietrichEntity, ClimateEntity):
         super().__init__(entry, "zone", "climate")
 
     @property
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         return self.zone.room_temp if self.zone else None
 
     @property
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         return self.zone.setpoint if self.zone else None
+
+    current_temperature = native_current_temperature
+    target_temperature = native_target_temperature
 
     @property
     def min_temp(self) -> float:

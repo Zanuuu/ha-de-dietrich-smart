@@ -28,6 +28,8 @@ async def async_setup_entry(
 class DhwWaterHeater(DeDietrichEntity, WaterHeaterEntity):
     _attr_name = None
     _attr_translation_key = "dhw"
+    _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
+    # Anciens noms pour HA 2026.10 : à retirer quand la version minimale passera à 2026.11.
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     _attr_operation_list = OPERATIONS
     _attr_supported_features = WaterHeaterEntityFeature.TARGET_TEMPERATURE | WaterHeaterEntityFeature.OPERATION_MODE
@@ -41,12 +43,15 @@ class DhwWaterHeater(DeDietrichEntity, WaterHeaterEntity):
         return READ_AS.get(mode or "", mode)
 
     @property
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         return self.dhw.temp if self.dhw else None
 
     @property
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         return self.dhw.comfort_setpoint if self.dhw else None
+
+    current_temperature = native_current_temperature
+    target_temperature = native_target_temperature
 
     @property
     def min_temp(self) -> float:
