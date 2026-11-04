@@ -11,5 +11,5 @@
   "issue_tracker": "https://github.com/Zanuuu/ha-de-dietrich-smart/issues",
   "loggers": ["custom_components.de_dietrich_smart"],
   "requirements": [],
-  "version": "0.1.0"
+  "version": "0.1.1"
 }

@@ -179,3 +179,14 @@ async def test_gas_today_resets_at_midnight(hass, config_entry, mock_client, fre
     await hass.async_block_till_done()
     s = hass.states.get(eid)
     assert s.state == "unknown" and s.attributes["last_reset"] == "2026-11-05T00:00:00+01:00"
+
+
+async def test_statistic_id_is_a_slug(hass, config_entry, mock_client, state, freezer) -> None:
+    # Identifiant réel du cloud : majuscules et tirets, refusés par le recorder dans un statistic_id.
+    freezer.move_to(NOW)
+    state.appliances[0].id = "A1B2-C3d4"
+    mock_client.fetch_consumption_days.return_value = [DayConsumption(date(2026, 11, 1), 30.0, 5.0)]
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    await async_wait_recording_done(hass)
+    assert (await _sums(hass, "de_dietrich_smart:a1b2_c3d4_gas_heating"))[-1] == 30.0

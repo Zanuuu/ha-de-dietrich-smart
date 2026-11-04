@@ -19,6 +19,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
+from homeassistant.util import slugify
 
 from .bdr.cloud import BdrClient
 from .bdr.models import AuthError, DayConsumption, HourConsumption, SourceError
@@ -161,7 +162,7 @@ class ConsumptionCoordinator(DataUpdateCoordinator[ConsumptionData]):
                 self.hass,
                 {
                     "source": DOMAIN,
-                    "statistic_id": f"{DOMAIN}:{appliance_id}_gas_{kind}",
+                    "statistic_id": f"{DOMAIN}:{slugify(appliance_id)}_gas_{kind}",
                     "name": label,
                     "unit_of_measurement": "kWh",
                     "unit_class": "energy",

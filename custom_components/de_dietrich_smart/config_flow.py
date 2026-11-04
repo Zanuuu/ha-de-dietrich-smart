@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Mapping
-from functools import partial
 from typing import Any
 from zoneinfo import ZoneInfo
 
@@ -13,7 +12,6 @@ from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResu
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.helpers import selector
-from homeassistant.helpers.httpx_client import create_async_httpx_client
 
 from .bdr.cloud import BdrClient
 from .bdr.models import AuthError, SourceError, State
@@ -28,6 +26,7 @@ from .const import (
     DOMAIN,
     DURATION_CHOICES,
 )
+from .http import client_factory
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,7 +51,7 @@ class DeDietrichConfigFlow(ConfigFlow, domain=DOMAIN):
             username,
             password,
             ZoneInfo(self.hass.config.time_zone),
-            client_factory=partial(create_async_httpx_client, self.hass, auto_cleanup=False),
+            client_factory=client_factory(self.hass),
         )
         try:
             await client.start()

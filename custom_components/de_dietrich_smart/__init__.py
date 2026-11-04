@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from functools import partial
 from zoneinfo import ZoneInfo
 
 from homeassistant.config_entries import ConfigEntry
@@ -11,7 +10,6 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
-from homeassistant.helpers.httpx_client import create_async_httpx_client
 from homeassistant.helpers.typing import ConfigType
 
 from . import faults, panel
@@ -21,6 +19,7 @@ from .const import DOMAIN
 from .coordinator import DeDietrichCoordinator
 from .devices import appliance_device_info
 from .energy import ConsumptionCoordinator
+from .http import client_factory
 from .journal import Journal
 from .repairs import async_update_issues
 from .services import async_setup_services
@@ -69,8 +68,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -
         entry.data[CONF_USERNAME],
         entry.data[CONF_PASSWORD],
         ZoneInfo(hass.config.time_zone),
-        # Clients fermés par le client BDR lui-même (celui de connexion à chaque usage).
-        client_factory=partial(create_async_httpx_client, hass, auto_cleanup=False),
+        client_factory=client_factory(hass),
     )
     await client.start()
     # Table des codes défaut lue hors de la boucle (lecture de fichier).
