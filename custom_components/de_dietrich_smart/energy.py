@@ -1,9 +1,11 @@
 """Consommation de gaz : relève horaire, conservation des heures, statistiques du tableau Énergie.
 
 Le cloud donne les jours en UTC (horodatés à minuit Z) sur plus d'un an, et les heures sur une
-quinzaine de jours seulement : les heures sont conservées dans un fichier `.storage`. Chaque
-import réécrit toute la série et recalcule la somme cumulée depuis le début : jamais
-d'addition incrémentale, donc jamais de double compte (bogue de la MR !50 de l'application).
+quinzaine de jours seulement : les heures sont conservées dans un fichier `.storage`. La somme
+cumulée est toujours recalculée depuis le début sur la série en mémoire : jamais d'addition
+incrémentale, donc jamais de double compte (bogue de la MR !50 de l'application). Le premier
+import après le chargement écrit toute la série ; les suivants, seulement les derniers jours,
+les seuls que le cloud peut avoir changés.
 """
 
 from __future__ import annotations
@@ -36,6 +38,8 @@ Kind = Literal["heating", "dhw"]
 FIRST_DAYS = 400
 FIRST_HOURS_DAYS = 16
 NEXT_DAYS = 2
+# Imports horaires : jours réécrits en plus de ceux relus (marge du jour UTC).
+REWRITE_MARGIN_DAYS = 1
 
 
 def _value(c: DayConsumption | HourConsumption, kind: Kind) -> float | None:
@@ -110,6 +114,8 @@ class ConsumptionCoordinator(DataUpdateCoordinator[ConsumptionData]):
         self._store: Store[dict] = Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.consumption")
         self._days: dict[date, DayConsumption] = {}
         self._hours: dict[datetime, HourConsumption] = {}
+        # Série complète écrite une fois par chargement (le prix a pu changer entre-temps).
+        self._full_import_done = False
 
     async def async_load(self) -> None:
         """Relit les jours et les heures conservés (le cloud ne garde qu'une quinzaine de jours d'heures)."""
@@ -162,8 +168,15 @@ class ConsumptionCoordinator(DataUpdateCoordinator[ConsumptionData]):
         from homeassistant.components.recorder.statistics import async_add_external_statistics
 
         price = self.config_entry.options.get(CONF_GAS_PRICE) if self.config_entry else None
+        since: datetime | None = None
+        if self._full_import_done:
+            first_day = now.astimezone(UTC).date() - timedelta(days=NEXT_DAYS + REWRITE_MARGIN_DAYS)
+            since = datetime.combine(first_day, datetime.min.time(), UTC)
+        self._full_import_done = True
         for kind, label in (("heating", "Gaz chauffage"), ("dhw", "Gaz eau chaude")):
             stats = build_statistics(days, hours, kind, now)  # type: ignore[arg-type]
+            if since is not None:
+                stats = [s for s in stats if s["start"] >= since]
             if not stats:
                 continue
             statistic_id = f"{DOMAIN}:{slugify(appliance_id)}_gas_{kind}"

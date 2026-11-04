@@ -227,3 +227,35 @@ async def test_no_cost_statistics_without_price(hass, config_entry, mock_client,
     await hass.async_block_till_done()
     await async_wait_recording_done(hass)
     assert await _sums(hass, "de_dietrich_smart:a1b2c3_gas_heating_cost") == []
+
+
+async def test_hourly_import_sends_recent_window_only(hass, config_entry, mock_client, freezer) -> None:
+    """Après le premier import complet, seuls les derniers jours sont réécrits, sommes comprises."""
+    from unittest.mock import patch
+
+    from homeassistant.components.recorder import statistics as rs
+
+    freezer.move_to(NOW)
+    mock_client.fetch_consumption_days.return_value = [
+        DayConsumption(date(2026, 10, 1) + timedelta(days=n), 20.0, 4.0) for n in range(31)
+    ]
+    mock_client.fetch_consumption_hours.return_value = hours_of(date(2026, 11, 2), 1.0, 0.25)
+    sent: dict[str, list[list]] = {}
+
+    def spy(hass_, metadata, stats):
+        sent.setdefault(metadata["statistic_id"], []).append(list(stats))
+        return original(hass_, metadata, stats)
+
+    original = rs.async_add_external_statistics
+    with patch.object(rs, "async_add_external_statistics", spy):
+        assert await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+        await config_entry.runtime_data.consumption.async_refresh()
+        await async_wait_recording_done(hass)
+    sid = "de_dietrich_smart:a1b2c3_gas_heating"
+    full, recent = sent[sid]
+    assert full[0]["start"] == datetime(2026, 10, 1, tzinfo=UTC)
+    cutoff = datetime(2026, 11, 1, tzinfo=UTC)
+    assert recent and all(s["start"] >= cutoff for s in recent)
+    assert [s for s in full if s["start"] >= cutoff] == recent
+    assert (await _sums(hass, sid))[-1] == full[-1]["sum"]
