@@ -10,6 +10,7 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
 
 from . import faults, panel
@@ -19,9 +20,9 @@ from .const import DOMAIN
 from .coordinator import DeDietrichCoordinator
 from .devices import appliance_device_info
 from .energy import ConsumptionCoordinator
-from .http import client_factory
+from .http import client_factory, user_agent
 from .journal import Journal
-from .repairs import async_update_issues
+from .repairs import async_delete_issues, async_update_issues
 from .services import async_setup_services
 from .websocket import async_setup_websocket
 
@@ -65,6 +66,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -
         entry.data[CONF_PASSWORD],
         ZoneInfo(hass.config.time_zone),
         client_factory=client_factory(hass),
+        user_agent=await user_agent(hass),
     )
     await client.start()
     # Table des codes défaut lue hors de la boucle (lecture de fichier).
@@ -124,3 +126,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) 
     if ok := await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
         panel.async_unregister(hass, entry.entry_id)
     return ok
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -> None:
+    """Intégration supprimée : alertes et fichiers .storage (journal, consommation) avec elle."""
+    async_delete_issues(hass, entry.entry_id)
+    for name in ("journal", "consumption"):
+        await Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.{name}").async_remove()

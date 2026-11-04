@@ -53,7 +53,7 @@ REDIRECT_URI = "com.b2c.remehaapp://login-callback"
 SCOPE = "openid https://bdrb2cprod.onmicrosoft.com/iotdevice/user_impersonation offline_access"
 API = "https://api.bdrthermea.net/Mobile/api"
 SUBSCRIPTION_KEY = "df605c5470d846fc91e848b1cc653ddf"
-USER_AGENT = "ha-de-dietrich-smart/0.1.0"
+USER_AGENT = "ha-de-dietrich-smart"
 
 ZONE_MODE = {
     "Scheduling": "schedule",
@@ -433,12 +433,14 @@ class BdrClient:
         password: str,
         tz: ZoneInfo,
         client_factory: Callable[..., httpx.AsyncClient] = httpx.AsyncClient,
+        user_agent: str = USER_AGENT,
     ):
         self._username = username
         self._password = password
         self._tz = tz
         # Fabrique de clients HTTP : Home Assistant passe la sienne (contexte SSL déjà chargé).
         self._client_factory = client_factory
+        self._user_agent = user_agent
         self._client: httpx.AsyncClient | None = None
         self._access_token: str | None = None
         self._refresh_token: str | None = None
@@ -464,7 +466,7 @@ class BdrClient:
     def _new_client(self, follow_redirects: bool = False) -> httpx.AsyncClient:
         # L'en-tête est posé après coup : la fabrique de HA fixe déjà les siens.
         client = self._client_factory(timeout=httpx.Timeout(30.0), follow_redirects=follow_redirects)
-        client.headers["User-Agent"] = USER_AGENT
+        client.headers["User-Agent"] = self._user_agent
         return client
 
     async def close(self) -> None:

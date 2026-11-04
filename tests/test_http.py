@@ -1,5 +1,7 @@
 """Clients HTTP du client BDR : détenus et fermés par lui, jamais ceux gérés par Home Assistant."""
 
+import json
+from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import httpx
@@ -27,6 +29,8 @@ async def test_setup_uses_owned_clients(hass, config_entry, state) -> None:
     with patch("custom_components.de_dietrich_smart.BdrClient", return_value=client) as cls:
         assert await hass.config_entries.async_setup(config_entry.entry_id)
         await hass.async_block_till_done()
+    manifest = json.loads((Path(__file__).parents[1] / "custom_components/de_dietrich_smart/manifest.json").read_text())
+    assert cls.call_args.kwargs["user_agent"] == f"ha-de-dietrich-smart/{manifest['version']}"
     made = cls.call_args.kwargs["client_factory"]()
     assert type(made) is httpx.AsyncClient
     await made.aclose()

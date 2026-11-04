@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Awaitable
 from typing import TYPE_CHECKING, Any
 
@@ -33,7 +34,13 @@ def _undo(entry: DeDietrichConfigEntry) -> dict[str, Any] | None:
         return None
     c = entry.runtime_data.journal.command(cid)
     assert c is not None
-    return {"command_id": cid, "undo_until": c["ts"] + UNDO_WINDOW, "action": c["action"]}
+    until = c["ts"] + UNDO_WINDOW
+    return {"command_id": cid, "undo_until": until, "undo_remaining": _remaining(until), "action": c["action"]}
+
+
+def _remaining(until: float | None) -> float | None:
+    """Secondes restantes pour annuler, selon l'horloge du serveur (celle du navigateur peut dériver)."""
+    return max(0.0, round(until - time.time(), 1)) if until is not None else None
 
 
 async def _send(connection: websocket_api.ActiveConnection, msg: dict, coro: Awaitable[CommandResult]) -> None:
@@ -43,7 +50,13 @@ async def _send(connection: websocket_api.ActiveConnection, msg: dict, coro: Awa
         connection.send_error(msg["id"], "command_failed", str(exc))
         return
     connection.send_result(
-        msg["id"], {"command_id": res.command_id, "message": res.message, "undo_until": res.undo_until}
+        msg["id"],
+        {
+            "command_id": res.command_id,
+            "message": res.message,
+            "undo_until": res.undo_until,
+            "undo_remaining": _remaining(res.undo_until),
+        },
     )
 
 

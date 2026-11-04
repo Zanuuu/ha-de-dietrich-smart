@@ -36,6 +36,8 @@ async def test_ws_set_week_validates(hass, loaded, config_entry, state, hass_ws_
     ok = [{"day": 1, "time": "06:30", "activity": 4}]
     res = await ws(client, 2, type=f"{T}/set_week", entry_id=config_entry.entry_id, program=2, switch_points=ok)
     assert res["success"] and res["result"]["undo_until"] is not None
+    # Délai restant donné par le serveur : le panneau ne dépend pas de l'horloge du navigateur.
+    assert 119 <= res["result"]["undo_remaining"] <= 120
     mock_client.zone_week.assert_awaited_once()
 
 
@@ -53,6 +55,7 @@ async def test_ws_undo_and_journal(hass, loaded, config_entry, hass_ws_client, m
     cid = res["result"]["command_id"]
     overview = await ws(client, 2, type=f"{T}/overview")
     assert overview["result"]["entries"][0]["undo"]["command_id"] == cid
+    assert 0 < overview["result"]["entries"][0]["undo"]["undo_remaining"] <= 120
     res = await ws(client, 3, type=f"{T}/undo", entry_id=config_entry.entry_id, command_id=cid)
     assert res["success"]
     mock_client.zone_activities.assert_awaited_with("z1", {1: 18.0})

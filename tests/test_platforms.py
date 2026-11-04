@@ -123,3 +123,21 @@ async def test_secondary_entities_disabled(hass, loaded):
     for eid in ("sensor.salon_heating_curve_flow", "binary_sensor.salon_preheat", "number.eau_chaude_reduced_setpoint"):
         ent = reg.async_get(eid)
         assert ent is not None and ent.disabled_by is er.RegistryEntryDisabler.INTEGRATION, eid
+
+
+async def test_curve_and_activities_added_when_read_later(hass, config_entry, mock_client, state):
+    """Lectures complémentaires absentes au démarrage : les réglages apparaissent à la relève qui les apporte."""
+    late = copy.deepcopy(state)
+    state.zone.heating_curve = None
+    state.zone.activities = []
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get("number.salon_heating_curve_slope") is None
+    assert hass.states.get("number.salon_activity_nuit_setpoint") is None
+    await push(hass, config_entry.runtime_data, late)
+    assert hass.states.get("number.salon_heating_curve_slope") is not None
+    assert hass.states.get("number.salon_activity_nuit_setpoint") is not None
+    # Une relève de plus n'ajoute rien en double.
+    count = len(hass.states.async_entity_ids("number"))
+    await push(hass, config_entry.runtime_data, copy.deepcopy(late))
+    assert len(hass.states.async_entity_ids("number")) == count

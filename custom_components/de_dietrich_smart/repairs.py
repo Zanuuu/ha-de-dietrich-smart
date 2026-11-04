@@ -15,16 +15,23 @@ from .const import (
     CONF_MAX_FLOOR_FLOW,
     DEFAULT_OPTIONS,
     DOMAIN,
+    UNREACHABLE_AFTER,
 )
-from .curve import flow_temperature
+from .curve import curve_flow
 from .events import low_pressure
 from .faults import describe
 
 if TYPE_CHECKING:
     from . import DeDietrichConfigEntry
 
-# Cloud injoignable : signalé après 15 min sans relève réussie.
-UNREACHABLE_AFTER = 900
+# Alertes tenues par entrée (identifiant : `<clé>_<entry_id>`).
+ISSUE_KEYS = ("cloud_unreachable", "low_pressure", "boiler_fault", "unsafe_floor_curve")
+
+
+@callback
+def async_delete_issues(hass: HomeAssistant, entry_id: str) -> None:
+    for key in ISSUE_KEYS:
+        ir.async_delete_issue(hass, DOMAIN, f"{key}_{entry_id}")
 
 
 def _fmt(v: float) -> str:
@@ -79,19 +86,17 @@ def async_update_issues(hass: HomeAssistant, entry: DeDietrichConfigEntry) -> No
         advice=(fault.advice or "") if fault else "",
     )
     c = state.zone.heating_curve if state and state.zone else None
-    unsafe = False
-    flow = 0.0
-    if c and opts[CONF_EMITTER] == "floor" and opts[CONF_CONNECTION] == "direct":
-        flow = flow_temperature(c["slope"], c["base"], float(opts[CONF_BASE_TEMP]), c.get("max_flow"))
-        unsafe = flow > float(opts[CONF_MAX_FLOOR_FLOW])
+    flow = curve_flow(c, float(opts[CONF_BASE_TEMP]))
+    floor_direct = opts[CONF_EMITTER] == "floor" and opts[CONF_CONNECTION] == "direct"
+    unsafe = floor_direct and flow is not None and flow > float(opts[CONF_MAX_FLOOR_FLOW])
     set_issue(
         "unsafe_floor_curve",
         unsafe,
         ir.IssueSeverity.ERROR,
-        flow=_fmt(flow),
+        flow=_fmt(flow) if flow is not None else "?",
         base_temp=_fmt(float(opts[CONF_BASE_TEMP])),
         max_floor_flow=_fmt(float(opts[CONF_MAX_FLOOR_FLOW])),
-        slope=_fmt(c["slope"]) if c else "",
-        base=_fmt(c["base"]) if c else "",
+        slope=_fmt(c["slope"]) if c and c.get("slope") is not None else "?",
+        base=_fmt(c["base"]) if c and c.get("base") is not None else "?",
         max_flow=_fmt(c["max_flow"]) if c and c.get("max_flow") is not None else "?",
     )

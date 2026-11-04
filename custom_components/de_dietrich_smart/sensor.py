@@ -21,7 +21,7 @@ from homeassistant.util import dt as dt_util
 from . import DeDietrichConfigEntry
 from .bdr.models import State
 from .coordinator import DeDietrichCoordinator
-from .curve import flow_temperature
+from .curve import curve_flow
 from .energy import today_kwh
 from .entity import DeDietrichEntity, Kind
 from .faults import describe
@@ -37,10 +37,10 @@ def _fault_code(s: State) -> str | None:
 
 def _curve_flow(s: State) -> float | None:
     a, z = s.appliance, s.zone
-    c = z.heating_curve if z else None
-    if not (a and c and a.outdoor_temp is not None):
+    if not (a and z and a.outdoor_temp is not None):
         return None
-    return round(flow_temperature(c["slope"], c["base"], a.outdoor_temp, c.get("max_flow")), 1)
+    flow = curve_flow(z.heating_curve, a.outdoor_temp)
+    return round(flow, 1) if flow is not None else None
 
 
 @dataclass(frozen=True, kw_only=True)
