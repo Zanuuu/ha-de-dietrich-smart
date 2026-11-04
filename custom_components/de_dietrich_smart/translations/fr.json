@@ -306,7 +306,7 @@
         },
         "switch_points": {
           "name": "Créneaux",
-          "description": "Liste de {day: 0 = dimanche … 6, time: \"HH:MM\", activity: 1 à 5} (chauffage) ou {day, time, comfort: true/false} (eau chaude)."
+          "description": "Liste des points de bascule. Chauffage : day (0 = dimanche … 6), time (\"HH:MM\"), activity (1 à 5). Eau chaude : day, time, comfort (true/false)."
         }
       }
     },
