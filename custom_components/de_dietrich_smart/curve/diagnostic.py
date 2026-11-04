@@ -32,8 +32,10 @@ HIGH_DAYS = 7.0
 # Bandes de température extérieure (moyenne de l'heure).
 MILD_ABOVE = 8.0
 COLD_BELOW = 0.0
-# Heure occupée : consigne à moins de 0,5 °C de la plus haute consigne de la fenêtre.
+# Heure occupée : consigne à moins de 0,5 °C de la consigne de confort, prise au 90e centile des
+# consignes horaires (une dérogation passagère plus haute ne la déplace pas).
 OCCUPIED_MARGIN = 0.5
+COMFORT_PERCENTILE = 0.9
 # Une bande ne compte qu'avec 24 heures occupées ; la confiance est haute à partir de 48.
 MIN_BAND_HOURS = 24
 HIGH_BAND_HOURS = 48
@@ -106,7 +108,8 @@ def count_short_cycles(changes: list[tuple[datetime, bool]], start: datetime, en
 
 def _bands(hours: list[Hour]) -> dict[str, dict[str, Any]]:
     complete = [h for h in hours if h.room is not None and h.setpoint is not None and h.outdoor is not None]
-    top = max((h.setpoint for h in complete if h.setpoint is not None), default=None)
+    setpoints = sorted(h.setpoint for h in complete if h.setpoint is not None)
+    top = setpoints[int(COMFORT_PERCENTILE * (len(setpoints) - 1))] if setpoints else None
     out: dict[str, dict[str, Any]] = {}
     for key, label in BANDS.items():
         out[key] = {"label": label, "hours": 0, "occupied": 0, "gap": None, "ratio": None, "recovery_h": None}

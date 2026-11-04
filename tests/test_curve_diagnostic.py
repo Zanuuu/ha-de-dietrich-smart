@@ -130,3 +130,11 @@ def test_count_short_cycles():
     ]
     assert count_short_cycles(changes, start, start + timedelta(days=2)) == 1.0
     assert count_short_cycles([], start, start + timedelta(days=2)) is None
+
+
+def test_one_override_does_not_hide_comfort_hours():
+    # Une dérogation d'une heure à 23 °C ne doit pas faire passer les heures de confort pour inoccupées.
+    h = hours(8, 10.0, -1.0)
+    h[30] = Hour(h[30].start, 22.0, 23.0, 10.0, 80.0)
+    d = diagnose(h, None, SAFE, FLOOR)
+    assert d.action == "raise_base" and d.bands["mild"]["occupied"] >= 8 * 16 - 1

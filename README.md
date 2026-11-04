@@ -12,7 +12,8 @@ Remeha Home apps.
 - **Water heater** entity: schedule, comfort or eco mode, comfort setpoint, boost button.
 - **Sensors**: room and outdoor temperature, water pressure, boiler activity, error status and
   fault code (with the meaning and advice from the EMC-S manual), next switch, override end,
-  heating ratio over the last hour, flow temperature from the heating curve, gas used today.
+  heating ratio over the last hour, flow temperature from the heating curve, current setpoint
+  (kept as hourly statistics for the curve diagnosis), heating curve recommendation, gas used today.
 - **Settings**: heating curve slope and base, setpoints of the five thermostat activities
   (Sleep, Home, Away, Morning, Evening), hot water setpoints, active program, fireplace mode.
 - **Energy dashboard**: hourly gas consumption for heating and hot water as external statistics
@@ -21,8 +22,24 @@ Remeha Home apps.
   set the gas price in the integration options, then pick the cost statistics
   (`Coût gaz chauffage`, `Coût gaz eau chaude`) with "Use an entity tracking the total costs".
   The whole history is computed at the current price.
-- **Sidebar panel** (French): weekly programs editable day by day, with copy to other days, and
-  a journal of events and commands. Any command can be undone within 2 minutes.
+- **Sidebar panel** (French): weekly programs editable day by day, with copy to other days, a
+  **heating curve** tab, and a journal of events and commands. Any command can be undone within
+  2 minutes.
+- **Heating curve**: chart of the current curve, the proposed one and the zone forbidden to floor
+  heating, adjustment with confirmation, and a **diagnosis** over the last 14 days of hourly
+  statistics. Hours are grouped by outdoor temperature (mild > 8 °C, cool 0 to 8 °C, cold < 0 °C),
+  and the gap between room temperature and setpoint is measured while in comfort setpoint. The
+  diagnosis proposes one small step at a time (cold deficit → slope +0.1, mild deficit → base +2,
+  cool deficit → base +1, excess or short cycles → lower) with a confidence level, or a one-time
+  switch to a floor heating curve that keeps today's flow temperature around 5 °C outside. The
+  curve model is an approximation: the manual only gives a chart, and the room sensor influence is
+  unknown.
+- **Floor heating guard**: with floor heating connected directly, a curve outside the floor
+  bounds (slope 0.2 to 1.0, base 15 to 35 °C, flow at the design outdoor temperature at most the
+  maximum allowed flow temperature) is refused, from entities, services and the panel alike. A
+  curve that is already unsafe can still be moved step by step toward safety. Undo restores the
+  previous curve as it was. Set the emitters to radiators, or the connection to mixing valve, to
+  lift the guard.
 - **Services**: `set_override`, `set_holiday`, `cancel_holiday`, `set_week_program`,
   `undo_last_command`.
 - **Repairs**: cloud unreachable, low water pressure, boiler fault, and a heating curve unsafe
@@ -43,10 +60,10 @@ Requires Home Assistant 2026.10 or later.
 | Option | Default | Use |
 |---|---|---|
 | Duration of a setpoint change | Until the next switch | Setpoint changes from Home Assistant |
-| Heat emitters | Floor heating | Heating curve checks |
+| Heat emitters | Floor heating | Floor heating guard, unsafe curve repair, diagnosis |
 | Floor heating connection | Direct | Direct: the boiler curve sets the floor water temperature |
-| Maximum allowed flow temperature | 45 °C | Unsafe curve repair |
-| Design outdoor temperature | −15 °C | Unsafe curve repair |
+| Maximum allowed flow temperature | 45 °C | Floor heating guard, unsafe curve repair |
+| Design outdoor temperature | −15 °C | Floor heating guard, unsafe curve repair |
 | Weather forecast | none | Heating curve simulator (next version) |
 
 ## Limitations
@@ -59,6 +76,10 @@ Requires Home Assistant 2026.10 or later.
   the fault code itself: read it on the boiler display.
 - Without an outdoor sensor, the outdoor temperature comes from the cloud weather service.
 - Hourly consumption arrives late and in whole kWh.
+- The curve diagnosis needs at least 3 days of statistics (7 for a high confidence), and a band
+  only counts with 24 occupied hours: right after installation, and before the first frost for
+  the cold band, it reports "not enough data". It judges on the thermostat only; room sensors
+  come with the manifold assistant.
 
 ## Migration from the former application
 
