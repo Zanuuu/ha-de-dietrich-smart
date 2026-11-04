@@ -26,6 +26,7 @@ from .bdr.cloud import BdrClient
 from .bdr.models import Dhw, SourceError, State, Zone
 from .const import DURATIONS, HOLIDAY_MAX_DAYS, UNDO_WINDOW
 from .coordinator import DeDietrichCoordinator
+from .curve import floor_excess, floor_violation
 from .events import DHW_MODE_FR, ZONE_MODE_FR, fmt_day, fmt_temp
 from .journal import Journal
 
@@ -94,6 +95,21 @@ class CommandRunner:
     @staticmethod
     def _dhw_before(d: Dhw) -> dict[str, Any]:
         return {"mode": d.mode, "comfort_setpoint": d.comfort_setpoint, "reduced_setpoint": d.reduced_setpoint}
+
+    def _check_floor(self, c: dict[str, Any], slope: float, base: float) -> None:
+        """Garde-fou du plancher (M12) : une courbe dangereuse n'est acceptée que si elle l'est moins qu'avant.
+
+        Sans cette tolérance, une courbe déjà hors bornes ne pourrait pas être corrigée réglage par réglage.
+        """
+        entry = self.coordinator.config_entry
+        opts = entry.options if entry else {}
+        reason = floor_violation(slope, base, c.get("max_flow"), opts)
+        if reason is None:
+            return
+        before = floor_excess(c["slope"], c["base"], c.get("max_flow"), opts)
+        if floor_excess(slope, base, c.get("max_flow"), opts) < before:
+            return
+        raise CommandError(f"courbe refusée pour le plancher : {reason}")
 
     # --- Exécution commune ------------------------------------------------
 
@@ -310,6 +326,7 @@ class CommandRunner:
             ):
                 if (lo is not None and v < lo) or (hi is not None and v > hi):
                     raise CommandError(f"{label} hors limites ({lo} à {hi})".replace(".", ","))
+            self._check_floor(c, new_slope, new_base)
             res = await self._run(
                 "courbe",
                 {"slope": new_slope, "base": new_base},

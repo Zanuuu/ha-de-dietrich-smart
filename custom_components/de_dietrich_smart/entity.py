@@ -5,13 +5,13 @@ from __future__ import annotations
 from collections.abc import Awaitable
 from typing import Literal
 
-from homeassistant.exceptions import HomeAssistantError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import DeDietrichConfigEntry
 from .bdr.models import Appliance, Dhw, Zone
-from .commands import CommandError, CommandResult
+from .commands import CloudRefused, CommandError, CommandResult
 from .const import DOMAIN
 from .coordinator import DeDietrichCoordinator
 from .devices import appliance_device_info
@@ -63,8 +63,15 @@ class DeDietrichEntity(CoordinatorEntity[DeDietrichCoordinator]):
         """Exécute une commande ; son échec devient une erreur traduite de Home Assistant."""
         try:
             return await coro
-        except CommandError as exc:
+        except CloudRefused as exc:
             raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="command_failed",
+                translation_placeholders={"message": str(exc)},
+            ) from exc
+        except CommandError as exc:
+            # Saisie refusée (bornes, garde-fou du plancher) : erreur de validation, comme les services.
+            raise ServiceValidationError(
                 translation_domain=DOMAIN,
                 translation_key="command_failed",
                 translation_placeholders={"message": str(exc)},

@@ -23,6 +23,9 @@ LOW_PRESSURE: Final = 1.0
 # Plancher chauffant : départ maxi admissible et température extérieure de base (la ville).
 DEFAULT_MAX_FLOOR_FLOW: Final = 45.0
 DEFAULT_BASE_TEMP: Final = -15.0
+# Bornes d'une courbe de plancher (pente, pied en °C), en plus du départ maxi admissible.
+FLOOR_SLOPE: Final = (0.2, 1.0)
+FLOOR_BASE: Final = (15.0, 35.0)
 
 # Options de l'entrée.
 CONF_DEFAULT_DURATION: Final = "default_duration"

@@ -11,6 +11,8 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import DeDietrichConfigEntry
+from .const import FLOOR_BASE, FLOOR_SLOPE
+from .curve import guard_active
 from .entity import DeDietrichEntity
 
 PARALLEL_UPDATES = 1
@@ -75,13 +77,21 @@ class CurveNumber(DeDietrichEntity, NumberEntity):
         c = self.zone.heating_curve if self.zone else None
         return c.get(self.part) if c else None
 
+    def _floor(self) -> tuple[float, float] | None:
+        """Bornes du plancher quand le garde-fou est actif (M12)."""
+        if not guard_active(self.entry.options):
+            return None
+        return FLOOR_SLOPE if self.part == "slope" else FLOOR_BASE
+
     @property
     def native_min_value(self) -> float:
-        return self._curve("_min", 0.0 if self.part == "slope" else 15.0)
+        lo = self._curve("_min", 0.0 if self.part == "slope" else 15.0)
+        return max(lo, f[0]) if (f := self._floor()) else lo
 
     @property
     def native_max_value(self) -> float:
-        return self._curve("_max", 4.0 if self.part == "slope" else 80.0)
+        hi = self._curve("_max", 4.0 if self.part == "slope" else 80.0)
+        return min(hi, f[1]) if (f := self._floor()) else hi
 
     @property
     def native_step(self) -> float:
