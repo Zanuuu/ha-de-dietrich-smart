@@ -64,6 +64,16 @@ SENSORS: tuple[DDSensorDescription, ...] = (
         value_fn=lambda s: s.zone.room_temp if s.zone else None,
         unavailable_when_none=True,
     ),
+    # Consigne en vigueur : capteur pour que l'enregistreur en garde les moyennes horaires (diagnostic).
+    DDSensorDescription(
+        key="target_temperature",
+        translation_key="target_temperature",
+        kind="zone",
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        value_fn=lambda s: s.zone.setpoint if s.zone else None,
+    ),
     DDSensorDescription(
         key="outdoor_temperature",
         translation_key="outdoor_temperature",

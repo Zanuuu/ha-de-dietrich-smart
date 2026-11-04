@@ -181,6 +181,9 @@
       },
       "gas_today": {
         "name": "Gaz aujourd'hui"
+      },
+      "target_temperature": {
+        "name": "Consigne"
       }
     },
     "binary_sensor": {

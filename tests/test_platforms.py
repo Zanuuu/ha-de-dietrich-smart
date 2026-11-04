@@ -19,6 +19,10 @@ def st(hass, entity_id):
 
 async def test_sensors(hass, loaded):
     assert st(hass, "sensor.salon_room_temperature").state == "19.4"
+    # Consigne en capteur : ses moyennes horaires alimentent le diagnostic de la courbe.
+    target = st(hass, "sensor.salon_setpoint")
+    assert target.state == str(loaded.coordinator.data.zone.setpoint)
+    assert target.attributes["state_class"] == "measurement" and target.attributes["unit_of_measurement"] == "°C"
     out = st(hass, "sensor.maison_exemple_outdoor_temperature")
     assert out.state == "6.0" and out.attributes["source"] == "météo"
     assert st(hass, "sensor.maison_exemple_water_pressure").state == "1.6"

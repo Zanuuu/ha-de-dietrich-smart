@@ -181,6 +181,9 @@
       },
       "gas_today": {
         "name": "Gas today"
+      },
+      "target_temperature": {
+        "name": "Setpoint"
       }
     },
     "binary_sensor": {
