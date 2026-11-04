@@ -59,10 +59,6 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
-async def _options_updated(hass: HomeAssistant, entry: DeDietrichConfigEntry) -> None:
-    async_update_issues(hass, entry)
-
-
 async def async_setup_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -> bool:
     client = BdrClient(
         entry.data[CONF_USERNAME],
@@ -116,7 +112,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -
     entry.async_on_unload(coordinator.async_add_listener(_on_data))
     coordinator.after_poll.append(_after_poll)
     entry.async_on_unload(lambda: coordinator.after_poll.remove(_after_poll))
-    entry.async_on_unload(entry.add_update_listener(_options_updated))
     async_update_issues(hass, entry)
     entry.async_on_unload(client.close)
     entry.async_on_unload(journal.async_save)
