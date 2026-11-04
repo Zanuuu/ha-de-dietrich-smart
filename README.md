@@ -60,7 +60,7 @@ Requires Home Assistant 2026.10 or later.
 ## Migration from the former application
 
 The integration replaces the `ancienne application` application of the projet. See
-[docs/bascule.md](docs/bascule.md) (French).
+[docs/bascule.md](docs/bascule.md) (French). Releases: [docs/version.md](docs/version.md) (French).
 
 ## License
 
