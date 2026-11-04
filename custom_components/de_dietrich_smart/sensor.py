@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.sensor import (
@@ -23,6 +23,7 @@ from .bdr.models import State
 from .coordinator import DeDietrichCoordinator
 from .curve import curve_flow
 from .curve.diagnostic import ACTIONS
+from .curve.dju import kwh_per_dju, local_days
 from .energy import today_kwh
 from .entity import DeDietrichEntity, Kind
 from .faults import describe
@@ -166,6 +167,7 @@ async def async_setup_entry(
     entities: list[SensorEntity] = [DDSensor(entry, d) for d in SENSORS if present[d.kind] is not None]
     if data.appliance:
         entities.append(GasTodaySensor(entry))
+        entities.append(HeatingPerDegreeDaySensor(entry))
     if data.zone:
         entities.append(CurveRecommendationSensor(entry))
     async_add_entities(entities)
@@ -263,3 +265,42 @@ class CurveRecommendationSensor(DeDietrichEntity, SensorEntity):
         if not d:
             return None
         return {"slope": d.slope, "base": d.base, "confidence": d.confidence, "reasons": d.reasons, "days": d.days}
+
+
+class HeatingPerDegreeDaySensor(DeDietrichEntity, SensorEntity):
+    """Chauffage par degré-jour unifié (base 18) sur les 30 derniers jours : la consommation à climat égal."""
+
+    _attr_translation_key = "heating_per_degree_day"
+    _attr_native_unit_of_measurement = "kWh/DJU"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 2
+
+    def __init__(self, entry: DeDietrichConfigEntry) -> None:
+        super().__init__(entry, "appliance", "heating_per_degree_day")
+        self.consumption = entry.runtime_data.consumption
+        self.outdoor = entry.runtime_data.outdoor
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(self.consumption.async_add_listener(self.async_write_ha_state))
+        self.async_on_remove(self.outdoor.async_add_listener(self.async_write_ha_state))
+
+    def _ratio(self) -> tuple[float | None, float | None, float | None]:
+        data = self.consumption.data
+        if not data or not self.outdoor.data:
+            return None, None, None
+        today = dt_util.now().date()
+        rows = local_days(
+            data.days, data.hours, self.outdoor.data, self.hass.config.time_zone, today - timedelta(days=30),
+            today - timedelta(days=1), None,
+        )  # fmt: skip
+        return kwh_per_dju(rows)
+
+    @property
+    def native_value(self) -> float | None:
+        return self._ratio()[0]
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        _, heating, dju = self._ratio()
+        return {"heating_kwh_30d": heating, "dju_30d": dju}

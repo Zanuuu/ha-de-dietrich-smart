@@ -196,6 +196,9 @@
           "switch_to_floor": "Passer à une courbe de plancher",
           "insufficient_data": "Données insuffisantes"
         }
+      },
+      "heating_per_degree_day": {
+        "name": "Chauffage par degré-jour"
       }
     },
     "binary_sensor": {

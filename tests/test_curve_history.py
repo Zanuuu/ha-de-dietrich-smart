@@ -110,3 +110,43 @@ async def test_ws_simulate_replays_recorded_outdoor(hass, config_entry, mock_cli
     assert res["success"] and res["result"]["error"] is None
     # Courbe du fixture 1,5 / 15 : 15 + 1,5 × 16 = 39 °C à 4 °C.
     assert [(r["outdoor"], r["current"]) for r in res["result"]["rows"]] == [(4.0, 39.0), (2.0, 42.0), (0.0, 45.0)]
+
+
+async def test_outdoor_prefers_recorded_days(hass, config_entry, mock_client, freezer):
+    import httpx
+    import respx
+
+    from custom_components.de_dietrich_smart.curve.outdoor import ARCHIVE_URL, FORECAST_URL
+
+    await hass.config.async_set_time_zone("UTC")
+    freezer.move_to("2026-11-04 10:00:00+00:00")
+    day = datetime(2026, 11, 3, tzinfo=UTC)
+    payload = {"daily": {"time": ["2026-11-03"], "temperature_2m_min": [0.0], "temperature_2m_max": [1.0]}}
+    with respx.mock:
+        respx.get(FORECAST_URL).mock(return_value=httpx.Response(200, json=payload))
+        respx.get(ARCHIVE_URL).mock(return_value=httpx.Response(200, json={"daily": {}}))
+        assert await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+        rt = config_entry.runtime_data
+        assert rt.outdoor.data[day.date()] == (0.0, 1.0, "open-meteo")
+        # Jour complet relevé par le capteur de la chaudière : il remplace Open-Meteo au jour suivant.
+        async_import_statistics(
+            hass,
+            {
+                "source": "recorder",
+                "statistic_id": "sensor.maison_exemple_outdoor_temperature",
+                "name": None,
+                "unit_of_measurement": "°C",
+                "unit_class": "temperature",
+                "has_sum": False,
+                "mean_type": StatisticMeanType.ARITHMETIC,
+            },
+            [
+                {"start": day + timedelta(hours=i), "mean": 5.0, "min": 4.0 - i % 3, "max": 6.0 + i % 4}
+                for i in range(24)
+            ],
+        )
+        await async_wait_recording_done(hass)
+        freezer.move_to("2026-11-05 10:00:00+00:00")
+        await rt.outdoor.async_refresh()
+    assert rt.outdoor.data[day.date()] == (2.0, 9.0, "ha")

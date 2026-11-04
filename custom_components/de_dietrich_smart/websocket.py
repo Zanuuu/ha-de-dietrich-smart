@@ -1,11 +1,13 @@
-"""API WebSocket du panneau latéral : état, journal, créneaux, activités, courbe, simulation, annulation."""
+"""API WebSocket du panneau latéral : état, journal, créneaux, activités, courbe, simulation, consommation,
+annulation."""
 
 from __future__ import annotations
 
 import logging
 import time
+from collections import Counter
 from collections.abc import Awaitable
-from datetime import timedelta
+from datetime import date, timedelta
 from typing import TYPE_CHECKING, Any
 
 import probatio
@@ -18,6 +20,7 @@ from homeassistant.util import dt as dt_util
 from .commands import CommandError, CommandResult
 from .const import (
     CONF_BASE_TEMP,
+    CONF_GAS_PRICE,
     CONF_MAX_FLOOR_FLOW,
     CONF_WEATHER_ENTITY,
     DEFAULT_OPTIONS,
@@ -27,6 +30,7 @@ from .const import (
     UNDO_WINDOW,
 )
 from .curve import curve_flow, floor_violation, guard_active
+from .curve.dju import DJU_BASE, csv_days, csv_hours, monthly, rows_provider, summary
 from .curve.history import fetch_hours, resolve_entity_ids
 from .curve.simulator import daily_summary, forecast_points, simulate
 
@@ -307,6 +311,60 @@ async def ws_simulate(hass: HomeAssistant, connection: websocket_api.ActiveConne
     )
 
 
+def _consumption(hass: HomeAssistant, entry: DeDietrichConfigEntry) -> tuple[Any, Any, float | None]:
+    """Lignes journalières à la demande, données brutes de consommation et prix du gaz."""
+    rt = entry.runtime_data
+    data = rt.consumption.data
+    price = entry.options.get(CONF_GAS_PRICE)
+    rows = rows_provider(
+        data.days if data else [], data.hours if data else [], rt.outdoor.data or {}, hass.config.time_zone, price
+    )
+    return rows, data, price
+
+
+@websocket_api.websocket_command({probatio.Required("type"): f"{T}/consumption", probatio.Required("entry_id"): str})
+@callback
+def ws_consumption(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Veille, mois et saison contre l'an dernier (corrigés du climat), kWh/DJU, mois sur un an."""
+    if not (entry := _entry(hass, connection, msg)):
+        return
+    rows, _, price = _consumption(hass, entry)
+    today = dt_util.now().date()
+    temps = entry.runtime_data.outdoor.data or {}
+    connection.send_result(
+        msg["id"],
+        {
+            "summary": summary(rows, today, price),
+            "months": monthly(rows(date(today.year - 1, today.month, 1), today)),
+            "price": price,
+            "dju_base": int(DJU_BASE),
+            "sources": dict(Counter(src for _, _, src in temps.values())),
+        },
+    )
+
+
+@websocket_api.websocket_command(
+    {
+        probatio.Required("type"): f"{T}/consumption_csv",
+        probatio.Required("entry_id"): str,
+        probatio.Required("period"): probatio.In(["days", "hours"]),
+    }
+)
+@callback
+def ws_consumption_csv(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Export CSV (séparateur « ; », virgule décimale) : jours connus, ou heures conservées."""
+    if not (entry := _entry(hass, connection, msg)):
+        return
+    rows, data, price = _consumption(hass, entry)
+    today = dt_util.now().date()
+    if msg["period"] == "days":
+        first = min((d.day for d in data.days), default=today) if data else today
+        text, label = csv_days(rows(first, today)), "jours"
+    else:
+        text, label = csv_hours(data.hours if data else [], hass.config.time_zone, price), "heures"
+    connection.send_result(msg["id"], {"filename": f"de-dietrich-conso-{label}-{today.isoformat()}.csv", "csv": text})
+
+
 @callback
 def async_setup_websocket(hass: HomeAssistant) -> None:
     for handler in (
@@ -318,6 +376,8 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         ws_curve,
         ws_set_heating_curve,
         ws_simulate,
+        ws_consumption,
+        ws_consumption_csv,
         ws_undo,
     ):
         websocket_api.async_register_command(hass, handler)
