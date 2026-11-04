@@ -34,6 +34,10 @@ Remeha Home apps.
   switch to a floor heating curve that keeps today's flow temperature around 5 °C outside. The
   curve model is an approximation: the manual only gives a chart, and the room sensor influence is
   unknown.
+- **Simulator** (heating curve tab): flow temperature requested by the current curve and by the
+  proposed one (or the one being adjusted), hour by hour, for the forecast of the weather entity
+  set in the options (hourly, else daily), or replayed over the last 7 days of recorded outdoor
+  temperature. It does not predict room temperatures.
 - **Floor heating guard**: with floor heating connected directly, a curve outside the floor
   bounds (slope 0.2 to 1.0, base 15 to 35 °C, flow at the design outdoor temperature at most the
   maximum allowed flow temperature) is refused, from entities, services and the panel alike. A
@@ -64,7 +68,7 @@ Requires Home Assistant 2026.10 or later.
 | Floor heating connection | Direct | Direct: the boiler curve sets the floor water temperature |
 | Maximum allowed flow temperature | 45 °C | Floor heating guard, unsafe curve repair |
 | Design outdoor temperature | −15 °C | Floor heating guard, unsafe curve repair |
-| Weather forecast | none | Heating curve simulator (next version) |
+| Weather forecast | none | Heating curve simulator (forecast of the coming days) |
 
 ## Limitations
 

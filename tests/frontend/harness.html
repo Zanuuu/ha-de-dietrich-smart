@@ -61,6 +61,18 @@
           "Bascule proposée une seule fois : même départ qu'aujourd'hui vers 5 °C dehors, puis de petits pas."], short_cycles_per_day: null }
       : { action: 'raise_base', slope: 0.5, base: 23, confidence: 'medium', days: 5.5, bands: bands([18, -0.3, 22], [70, -0.8, 41], [4, -1.2, 63]),
         reasons: ['Bande fraîche (0 à 8 °C) : 0,8 °C sous la consigne en moyenne sur 70 h occupées.'], short_cycles_per_day: 1.5 } };
+  // Simulation : températures extérieures horaires (prévisions sur 3 jours ou 7 jours relevés).
+  const outdoorAt = (h) => 6 + 4 * Math.sin(((h % 24) - 9) / 24 * 2 * Math.PI) - h / 24;
+  const simulate = (source) => {
+    const start = Math.floor(now / 3600) * 3600 + (source === 'history' ? -7 * 86400 : 3600);
+    const n = source === 'history' ? 7 * 24 : 72;
+    const c = curve.curve, p = curve.diagnosis;
+    const rows = Array.from({ length: n }, (_, i) => {
+      const t = Math.round(outdoorAt(i + new Date(start * 1000).getUTCHours()) * 10) / 10;
+      return { ts: new Date((start + i * 3600) * 1000).toISOString(), outdoor: t, current: c.base + c.slope * (20 - t), proposed: p.base + p.slope * (20 - t) };
+    });
+    return { source, error: null, proposed: { slope: p.slope, base: p.base }, max_floor_flow: 45, guard_active: true, rows, days: [] };
+  };
   window.hass = {
     config: { time_zone: 'Europe/Paris' },
     // ?user=guest : compte non administrateur (lecture seule).
@@ -69,6 +81,7 @@
       if (msg.type.endsWith('/overview')) return overview;
       if (msg.type.endsWith('/journal')) return journal;
       if (msg.type.endsWith('/curve')) return curve;
+      if (msg.type.endsWith('/simulate')) return simulate(msg.source);
       return { command_id: 13, message: 'Programme 2 modifié : lundi', undo_until: now + 120, undo_remaining: 120 };
     },
   };

@@ -1,24 +1,42 @@
-"""API WebSocket du panneau latéral : état, journal, créneaux, activités, courbe, annulation."""
+"""API WebSocket du panneau latéral : état, journal, créneaux, activités, courbe, simulation, annulation."""
 
 from __future__ import annotations
 
+import logging
 import time
 from collections.abc import Awaitable
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 import probatio
 from homeassistant.components import websocket_api
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.util import dt as dt_util
 
 from .commands import CommandError, CommandResult
-from .const import CONF_BASE_TEMP, CONF_MAX_FLOOR_FLOW, DEFAULT_OPTIONS, DOMAIN, FLOOR_BASE, FLOOR_SLOPE, UNDO_WINDOW
+from .const import (
+    CONF_BASE_TEMP,
+    CONF_MAX_FLOOR_FLOW,
+    CONF_WEATHER_ENTITY,
+    DEFAULT_OPTIONS,
+    DOMAIN,
+    FLOOR_BASE,
+    FLOOR_SLOPE,
+    UNDO_WINDOW,
+)
 from .curve import curve_flow, floor_violation, guard_active
+from .curve.history import fetch_hours, resolve_entity_ids
+from .curve.simulator import daily_summary, forecast_points, simulate
 
 if TYPE_CHECKING:
     from . import DeDietrichConfigEntry
 
 T = DOMAIN
+_LOGGER = logging.getLogger(__name__)
+# Rejeu : 7 derniers jours de statistiques du capteur extérieur.
+REPLAY_DAYS = 7
 
 
 def _entry(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> DeDietrichConfigEntry | None:
@@ -217,6 +235,78 @@ async def ws_set_heating_curve(hass: HomeAssistant, connection: websocket_api.Ac
         await _send(connection, msg, entry.runtime_data.commands.set_heating_curve(msg["slope"], msg["base"]))
 
 
+async def _forecast(hass: HomeAssistant, entity_id: str) -> list[tuple[Any, float]]:
+    """Prévisions horaires de l'entité météo, à défaut journalières."""
+    for kind in ("hourly", "daily"):
+        try:
+            res = await hass.services.async_call(
+                "weather", "get_forecasts", {"entity_id": entity_id, "type": kind}, blocking=True, return_response=True
+            )
+        except HomeAssistantError as exc:
+            _LOGGER.debug("prévisions %s indisponibles pour %s : %s", kind, entity_id, exc)
+            continue
+        by_entity: Any = (res or {}).get(entity_id) or {}
+        if points := forecast_points(by_entity.get("forecast") or [], daily=kind == "daily"):
+            return points
+    return []
+
+
+@websocket_api.websocket_command(
+    {
+        probatio.Required("type"): f"{T}/simulate",
+        probatio.Required("entry_id"): str,
+        probatio.Required("source"): probatio.In(["forecast", "history"]),
+        probatio.Optional("slope"): probatio.Coerce(float),
+        probatio.Optional("base"): probatio.Coerce(float),
+    }
+)
+@websocket_api.async_response
+async def ws_simulate(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Départ prévu (prévisions) ou rejoué (7 derniers jours) pour la courbe actuelle et la proposée."""
+    if not (entry := _entry(hass, connection, msg)):
+        return
+    rt = entry.runtime_data
+    state = rt.coordinator.data
+    curve = state.zone.heating_curve if state and state.zone else None
+    opts = {**DEFAULT_OPTIONS, **entry.options}
+    dg = rt.diagnostic.data
+    proposed: dict[str, float] | None = None
+    if "slope" in msg and "base" in msg:
+        proposed = {"slope": msg["slope"], "base": msg["base"]}
+    elif dg and dg.action not in ("keep", "insufficient_data") and dg.slope is not None and dg.base is not None:
+        proposed = {"slope": dg.slope, "base": dg.base}
+    error, points = None, []
+    if not curve:
+        error = "Courbe de chauffe pas encore lue sur le cloud."
+    elif msg["source"] == "forecast":
+        if not (weather := opts.get(CONF_WEATHER_ENTITY)):
+            error = "Choisissez une entité météo dans les options de l'intégration pour simuler les prochains jours."
+        elif not (points := await _forecast(hass, weather)):
+            error = f"Pas de prévisions de température pour {weather}."
+    elif "recorder" not in hass.config.components:
+        error = "Le rejeu des derniers jours demande l'enregistreur de Home Assistant."
+    else:
+        now = dt_util.utcnow()
+        ids = resolve_entity_ids(hass, state)
+        hours = await fetch_hours(hass, {"outdoor": ids["outdoor"]}, now - timedelta(days=REPLAY_DAYS), now)
+        points = [(h.start, h.outdoor) for h in hours if h.outdoor is not None]
+        if not points:
+            error = "Pas encore de températures extérieures enregistrées."
+    rows = simulate(points, curve, proposed) if curve else []
+    connection.send_result(
+        msg["id"],
+        {
+            "source": msg["source"],
+            "error": error,
+            "proposed": proposed,
+            "max_floor_flow": float(opts[CONF_MAX_FLOOR_FLOW]),
+            "guard_active": guard_active(opts),
+            "rows": rows,
+            "days": daily_summary(rows, hass.config.time_zone),
+        },
+    )
+
+
 @callback
 def async_setup_websocket(hass: HomeAssistant) -> None:
     for handler in (
@@ -227,6 +317,7 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         ws_set_activity,
         ws_curve,
         ws_set_heating_curve,
+        ws_simulate,
         ws_undo,
     ):
         websocket_api.async_register_command(hass, handler)

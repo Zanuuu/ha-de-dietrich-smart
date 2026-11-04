@@ -140,3 +140,47 @@ async def test_ws_set_heating_curve_requires_admin(
     assert not res["success"] and res["error"]["code"] == "unauthorized"
     res = await ws(client, 2, type=f"{T}/curve", entry_id=config_entry.entry_id)
     assert res["success"]
+
+
+async def test_ws_simulate_forecast(hass, config_entry, mock_client, hass_ws_client):
+    from homeassistant.core import SupportsResponse
+
+    calls = []
+
+    async def forecasts(call):
+        calls.append(call.data)
+        fc = [{"datetime": f"2026-11-05T{9 + h:02d}:00:00+00:00", "temperature": 10.0 - h} for h in range(3)]
+        return {"weather.maison": {"forecast": fc}}
+
+    hass.services.async_register("weather", "get_forecasts", forecasts, supports_response=SupportsResponse.ONLY)
+    hass.config_entries.async_update_entry(config_entry, options={"weather_entity": "weather.maison"})
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    client = await hass_ws_client(hass)
+    res = await ws(client, 1, type=f"{T}/simulate", entry_id=config_entry.entry_id, source="forecast")
+    assert res["success"], res
+    r = res["result"]
+    assert calls[0]["type"] == "hourly" and r["error"] is None
+    # Courbe actuelle 1,5 / 15 ; proposée : la bascule du diagnostic (0,3 / 33).
+    assert r["rows"][0] == {"ts": "2026-11-05T09:00:00+00:00", "outdoor": 10.0, "current": 30.0, "proposed": 36.0}
+    assert r["proposed"] == {"slope": 0.3, "base": 33.0} and r["max_floor_flow"] == 45.0
+    assert len(r["days"]) == 1
+    # Courbe proposée donnée par le panneau (réglage en cours).
+    res = await ws(
+        client, 2, type=f"{T}/simulate", entry_id=config_entry.entry_id, source="forecast", slope=0.5, base=22
+    )
+    assert res["result"]["rows"][0]["proposed"] == 27.0
+
+
+async def test_ws_simulate_without_weather_entity(hass, loaded, config_entry, hass_ws_client):
+    client = await hass_ws_client(hass)
+    res = await ws(client, 1, type=f"{T}/simulate", entry_id=config_entry.entry_id, source="forecast")
+    assert res["success"] and res["result"]["rows"] == []
+    assert "entité météo" in res["result"]["error"]
+
+
+async def test_ws_simulate_history_without_recorder(hass, loaded, config_entry, hass_ws_client):
+    client = await hass_ws_client(hass)
+    res = await ws(client, 1, type=f"{T}/simulate", entry_id=config_entry.entry_id, source="history")
+    assert res["success"] and res["result"]["rows"] == []
+    assert "enregistreur" in res["result"]["error"]
