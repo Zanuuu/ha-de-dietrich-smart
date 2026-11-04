@@ -80,3 +80,33 @@ async def test_resolve_entity_ids(hass, config_entry, mock_client):
         "ratio": "sensor.salon_heating_ratio",
         "heating": "binary_sensor.salon_heating",
     }
+
+
+async def test_ws_simulate_replays_recorded_outdoor(hass, config_entry, mock_client, hass_ws_client):
+    from homeassistant.util import dt as dt_util
+
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    start = dt_util.utcnow().replace(minute=0, second=0, microsecond=0) - timedelta(hours=5)
+    async_import_statistics(
+        hass,
+        {
+            "source": "recorder",
+            "statistic_id": "sensor.maison_exemple_outdoor_temperature",
+            "name": None,
+            "unit_of_measurement": "°C",
+            "unit_class": "temperature",
+            "has_sum": False,
+            "mean_type": StatisticMeanType.ARITHMETIC,
+        },
+        [{"start": start + timedelta(hours=i), "mean": t, "min": t, "max": t} for i, t in enumerate((4.0, 2.0, 0.0))],
+    )
+    await async_wait_recording_done(hass)
+    client = await hass_ws_client(hass)
+    await client.send_json(
+        {"id": 1, "type": "de_dietrich_smart/simulate", "entry_id": config_entry.entry_id, "source": "history"}
+    )
+    res = await client.receive_json()
+    assert res["success"] and res["result"]["error"] is None
+    # Courbe du fixture 1,5 / 15 : 15 + 1,5 × 16 = 39 °C à 4 °C.
+    assert [(r["outdoor"], r["current"]) for r in res["result"]["rows"]] == [(4.0, 39.0), (2.0, 42.0), (0.0, 45.0)]

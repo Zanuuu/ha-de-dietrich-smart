@@ -50,6 +50,19 @@ with sync_playwright() as pw:
                 page.wait_for_selector("dd-smart-panel >> dialog[open]")
                 page.screenshot(path=f"{OUT}/editor-{size}-{theme}.png")
             page.close()
+    # Simulation sur les 7 derniers jours (rejeu).
+    page = browser.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=1, locale="fr-FR")
+    page.on("console", lambda m: m.type == "error" and problems.append(f"console: {m.text}"))
+    page.on("pageerror", lambda e: problems.append(f"page: {e}"))
+    page.goto(BASE)
+    page.wait_for_selector("dd-smart-panel >> .week")
+    page.locator("dd-smart-panel >> nav button", has_text="Courbe").click()
+    page.locator("dd-smart-panel >> .seg-ctl button", has_text="7 derniers jours").click()
+    page.wait_for_selector("dd-smart-panel >> tbody tr:nth-child(7)")
+    page.screenshot(path=f"{OUT}/curve-history-mobile.png", full_page=True)
+    if over := page.evaluate(OVERFLOW):
+        problems.append(f"débordement simulation: {over}")
+    page.close()
     # Courbe dangereuse pour le plancher : alerte et bascule proposée, puis confirmation.
     for width, height, size in ((390, 844, "mobile"), (1440, 960, "bureau")):
         page = browser.new_page(viewport={"width": width, "height": height}, device_scale_factor=1, locale="fr-FR")

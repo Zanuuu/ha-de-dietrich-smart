@@ -88,6 +88,8 @@ class DdSmartPanel extends LitElement {
     _curve: { state: true },
     _draft: { state: true },
     _confirm: { state: true },
+    _sim: { state: true },
+    _simSource: { state: true },
   };
 
   constructor() {
@@ -108,6 +110,8 @@ class DdSmartPanel extends LitElement {
     this._curve = null;
     this._draft = null;
     this._confirm = null;
+    this._sim = null;
+    this._simSource = 'forecast';
   }
 
   connectedCallback() {
@@ -155,6 +159,12 @@ class DdSmartPanel extends LitElement {
   async _loadCurve() {
     if (!this._entryId) return;
     this._curve = await this._ws({ type: `${T}/curve`, entry_id: this._entryId });
+    await this._loadSim();
+  }
+
+  async _loadSim() {
+    if (!this._entryId) return;
+    this._sim = await this._ws({ type: `${T}/simulate`, entry_id: this._entryId, source: this._simSource });
   }
 
   get _entry() { return this._entries?.find((e) => e.entry_id === this._entryId); }
@@ -581,8 +591,78 @@ class DdSmartPanel extends LitElement {
           <button class="primary" ?disabled=${this._draftBlocked()} @click=${() => this._openConfirm()}>Appliquer…</button>
         </div>
       </section>` : nothing}
+      ${this._renderSimulation(c, shown, d ? 'réglage en cours' : 'proposée')}
       ${this._renderDiagnosis(dg)}
     `;
+  }
+
+  _renderSimulation(c, prop, propName) {
+    const sim = this._sim;
+    const tz = this.hass?.config?.time_zone || 'Europe/Paris';
+    // Départ recalculé ici : la courbe proposée suit le réglage en cours sans nouvel appel.
+    const rows = (sim?.rows || []).map((r) => ({ ...r, ts: new Date(r.ts), current: flowAt(c.slope, c.base, r.outdoor, c.max_flow),
+      proposed: prop ? flowAt(prop.slope, prop.base, r.outdoor, c.max_flow) : null }));
+    const dayKey = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', day: 'numeric', timeZone: tz });
+    const days = [];
+    for (const r of rows) {
+      const k = dayKey.format(r.ts);
+      let d = days[days.length - 1];
+      if (!d || d.k !== k) { d = { k, out: [], cur: [], prop: [] }; days.push(d); }
+      d.out.push(r.outdoor); d.cur.push(r.current); if (r.proposed != null) d.prop.push(r.proposed);
+    }
+    const range = (a, n = 0) => (a.length ? `${fNum(Math.min(...a), n)} à ${fNum(Math.max(...a), n)} °C` : '—');
+    return html`<section class="card">
+      <div class="head"><h2>Simulation</h2>
+        <div class="seg-ctl" role="group" aria-label="Températures extérieures simulées">
+          ${[['forecast', 'Prévisions'], ['history', '7 derniers jours']].map(([k, l]) => html`
+            <button aria-pressed=${this._simSource === k} @click=${() => { this._simSource = k; this._sim = null; this._loadSim(); }}>${l}</button>`)}
+        </div></div>
+      <p class="help">Départ demandé par la courbe pour les températures extérieures ${this._simSource === 'forecast'
+        ? 'prévues' : 'relevées'}. Ne prédit pas la température des pièces.</p>
+      ${!sim ? html`<p class="muted">Chargement…</p>`
+        : sim.error ? html`<p class="muted">${sim.error}</p>`
+        : html`${this._simChart(rows, sim, propName)}
+          <div class="tbl"><table>
+            <thead><tr><th>Jour</th><th>Extérieur</th><th>Départ actuel</th>${prop ? html`<th>Départ ${propName === 'proposée' ? 'proposé' : 'réglé'}</th>` : nothing}</tr></thead>
+            <tbody>${days.map((d) => html`<tr><td>${d.k}</td><td>${range(d.out)}</td><td>${range(d.cur)}</td>${prop ? html`<td>${range(d.prop)}</td>` : nothing}</tr>`)}</tbody>
+          </table></div>`}
+    </section>`;
+  }
+
+  _simChart(rows, sim, propName) {
+    if (rows.length < 2) return nothing;
+    const W = this.narrow ? 360 : 640, H = this.narrow ? 200 : 220;
+    const L = 40, R = 10, TOP = 10, B = 26;
+    const vals = rows.flatMap((r) => [r.current, r.proposed]).filter((v) => v != null);
+    const yMin = Math.floor(Math.min(...vals) / 5) * 5 - 5, yMax = Math.max(Math.ceil(Math.max(...vals) / 5) * 5 + 5, sim.guard_active ? sim.max_floor_flow + 5 : 0);
+    const t0 = rows[0].ts.getTime(), t1 = rows[rows.length - 1].ts.getTime();
+    const x = (ts) => L + ((ts.getTime() - t0) / (t1 - t0)) * (W - L - R);
+    const y = (v) => TOP + ((yMax - v) / (yMax - yMin)) * (H - TOP - B);
+    const pts = (k) => rows.filter((r) => r[k] != null).map((r) => `${x(r.ts).toFixed(1)},${y(r[k]).toFixed(1)}`).join(' ');
+    const tz = this.hass?.config?.time_zone || 'Europe/Paris';
+    // Heure locale en chiffres seuls (en français, « 00 h »).
+    const hour = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', hourCycle: 'h23', timeZone: tz });
+    const wd = new Intl.DateTimeFormat('fr-FR', { weekday: 'short', timeZone: tz });
+    const midnights = rows.filter((r, i) => i > 0 && Number(hour.format(r.ts)) === 0);
+    const ys = [];
+    for (let v = Math.ceil(yMin / 10) * 10; v <= yMax; v += 10) ys.push(v);
+    const peak = Math.max(...rows.map((r) => r.current));
+    return html`<figure class="chart">
+      <svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Départ actuel jusqu'à ${fDeg(peak)} sur la période.">
+        ${ys.map((v) => svg`<line x1=${L} x2=${W - R} y1=${y(v)} y2=${y(v)} class="grid"></line>
+          <text x=${L - 6} y=${y(v) + 4} text-anchor="end" class="tick">${v}</text>`)}
+        ${midnights.map((r) => svg`<line x1=${x(r.ts)} x2=${x(r.ts)} y1=${TOP} y2=${H - B} class="base"></line>
+          <text x=${x(r.ts) + 4} y=${H - B + 16} class="tick">${wd.format(r.ts)}</text>`)}
+        ${sim.guard_active ? svg`<line x1=${L} x2=${W - R} y1=${y(sim.max_floor_flow)} y2=${y(sim.max_floor_flow)} class="limit"></line>` : nothing}
+        <polyline points=${pts('current')} class="cur"></polyline>
+        ${rows.some((r) => r.proposed != null) ? svg`<polyline points=${pts('proposed')} class="prop"></polyline>` : nothing}
+      </svg>
+      <figcaption class="legend">
+        <span><i class="k cur"></i>Départ, courbe actuelle (°C)</span>
+        ${rows.some((r) => r.proposed != null) ? html`<span><i class="k prop"></i>Départ, courbe ${propName}</span>` : nothing}
+        ${sim.guard_active ? html`<span><i class="k lim"></i>Maxi du plancher (${fDeg(sim.max_floor_flow)})</span>` : nothing}
+      </figcaption>
+    </figure>`;
   }
 
   _curveChart(c, g, now, prop, propLabel) {
@@ -822,6 +902,7 @@ class DdSmartPanel extends LitElement {
     .k.prop { border-top: 2.5px dashed var(--warning-color, #ffa600); }
     .k.pt { width: 10px; height: 10px; border: 0; border-radius: 50%; background: var(--s); }
     .k.base { border-top: 1.5px dotted var(--secondary-text-color); }
+    .k.lim { border-top: 1.5px solid var(--error-color); }
     .badge { font-size: 12px; border-radius: 999px; padding: 2px 10px; border: 1px solid var(--divider-color); color: var(--secondary-text-color); }
     .badge.high { color: var(--success-color, #43a047); border-color: currentColor; }
     .badge.medium { color: var(--warning-color, #ffa600); border-color: currentColor; }
