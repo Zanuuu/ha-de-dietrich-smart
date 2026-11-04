@@ -29,6 +29,8 @@ CONF_CONNECTION: Final = "connection"
 CONF_MAX_FLOOR_FLOW: Final = "max_floor_flow"
 CONF_BASE_TEMP: Final = "base_temp"
 CONF_WEATHER_ENTITY: Final = "weather_entity"
+# Prix du gaz (€/kWh) : vide = pas de statistiques de coût.
+CONF_GAS_PRICE: Final = "gas_price"
 DEFAULT_OPTIONS: Final = {
     CONF_DEFAULT_DURATION: "next",
     CONF_EMITTER: "floor",

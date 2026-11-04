@@ -105,8 +105,10 @@ async def test_options_flow(hass, config_entry):
             "connection": "direct",
             "max_floor_flow": 45,
             "base_temp": -15,
+            "gas_price": 0.15,
         },
     )
     assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert config_entry.options["gas_price"] == 0.15
     assert config_entry.options["default_duration"] == "2h"
     assert config_entry.options["max_floor_flow"] == 45

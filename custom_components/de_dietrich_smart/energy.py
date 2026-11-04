@@ -23,7 +23,7 @@ from homeassistant.util import slugify
 
 from .bdr.cloud import BdrClient
 from .bdr.models import AuthError, DayConsumption, HourConsumption, SourceError
-from .const import DOMAIN
+from .const import CONF_GAS_PRICE, DOMAIN
 
 if TYPE_CHECKING:
     from homeassistant.components.recorder.models import StatisticData
@@ -72,6 +72,13 @@ def build_statistics(
         total += points[start]
         out.append({"start": start, "state": points[start], "sum": round(total, 3)})
     return out
+
+
+def build_cost_statistics(stats: list[StatisticData], price: float) -> list[StatisticData]:
+    """Coût de chaque heure au prix fixe, même cumul : tout l'historique suit le prix du moment."""
+    return [
+        {"start": s["start"], "state": round(s["state"] * price, 4), "sum": round(s["sum"] * price, 4)} for s in stats
+    ]
 
 
 def today_kwh(hours: list[HourConsumption], now: datetime, time_zone: str) -> float | None:
@@ -154,15 +161,17 @@ class ConsumptionCoordinator(DataUpdateCoordinator[ConsumptionData]):
         from homeassistant.components.recorder.models import StatisticMeanType
         from homeassistant.components.recorder.statistics import async_add_external_statistics
 
+        price = self.config_entry.options.get(CONF_GAS_PRICE) if self.config_entry else None
         for kind, label in (("heating", "Gaz chauffage"), ("dhw", "Gaz eau chaude")):
             stats = build_statistics(days, hours, kind, now)  # type: ignore[arg-type]
             if not stats:
                 continue
+            statistic_id = f"{DOMAIN}:{slugify(appliance_id)}_gas_{kind}"
             async_add_external_statistics(
                 self.hass,
                 {
                     "source": DOMAIN,
-                    "statistic_id": f"{DOMAIN}:{slugify(appliance_id)}_gas_{kind}",
+                    "statistic_id": statistic_id,
                     "name": label,
                     "unit_of_measurement": "kWh",
                     "unit_class": "energy",
@@ -171,3 +180,18 @@ class ConsumptionCoordinator(DataUpdateCoordinator[ConsumptionData]):
                 },
                 stats,
             )
+            if price:
+                # Le tableau Énergie n'applique pas de prix à une statistique externe : il lui faut le coût.
+                async_add_external_statistics(
+                    self.hass,
+                    {
+                        "source": DOMAIN,
+                        "statistic_id": f"{statistic_id}_cost",
+                        "name": f"Coût {label[0].lower()}{label[1:]}",
+                        "unit_of_measurement": self.hass.config.currency,
+                        "unit_class": None,
+                        "has_sum": True,
+                        "mean_type": StatisticMeanType.NONE,
+                    },
+                    build_cost_statistics(stats, float(price)),
+                )

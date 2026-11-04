@@ -17,7 +17,10 @@ Remeha Home apps.
   (Sleep, Home, Away, Morning, Evening), hot water setpoints, active program, fireplace mode.
 - **Energy dashboard**: hourly gas consumption for heating and hot water as external statistics
   (`De Dietrich Smart: Gaz chauffage` and `Gaz eau chaude`), with up to 400 days of history
-  imported on first start. Set the gas price in the Energy dashboard.
+  imported on first start. The Energy dashboard cannot apply a price to external statistics:
+  set the gas price in the integration options, then pick the cost statistics
+  (`Coût gaz chauffage`, `Coût gaz eau chaude`) with "Use an entity tracking the total costs".
+  The whole history is computed at the current price.
 - **Sidebar panel** (French): weekly programs editable day by day, with copy to other days, and
   a journal of events and commands. Any command can be undone within 2 minutes.
 - **Services**: `set_override`, `set_holiday`, `cancel_holiday`, `set_week_program`,

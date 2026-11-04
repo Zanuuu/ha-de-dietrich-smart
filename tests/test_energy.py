@@ -5,11 +5,11 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder.statistics import statistics_during_period
-from pytest_homeassistant_custom_component.common import async_fire_time_changed
+from pytest_homeassistant_custom_component.common import MockConfigEntry, async_fire_time_changed
 from pytest_homeassistant_custom_component.components.recorder.common import async_wait_recording_done
 
 from custom_components.de_dietrich_smart.bdr.models import DayConsumption, HourConsumption
-from custom_components.de_dietrich_smart.energy import build_statistics, today_kwh
+from custom_components.de_dietrich_smart.energy import build_cost_statistics, build_statistics, today_kwh
 
 NOW = datetime(2026, 11, 4, 12, 30, tzinfo=UTC)
 
@@ -190,3 +190,40 @@ async def test_statistic_id_is_a_slug(hass, config_entry, mock_client, state, fr
     await hass.async_block_till_done()
     await async_wait_recording_done(hass)
     assert (await _sums(hass, "de_dietrich_smart:a1b2_c3d4_gas_heating"))[-1] == 30.0
+
+
+def test_cost_statistics_follow_energy() -> None:
+    stats = build_statistics(
+        [DayConsumption(date(2026, 11, 1), 30.0, 5.0)], hours_of(date(2026, 11, 2), 1.0), "heating", NOW
+    )
+    cost = build_cost_statistics(stats, 0.15)
+    assert [c["start"] for c in cost] == [s["start"] for s in stats]
+    assert cost[0]["state"] == pytest.approx(30.0 * 0.15)
+    assert cost[-1]["sum"] == pytest.approx(54.0 * 0.15)
+
+
+async def test_cost_statistics_imported_with_price(hass, mock_client, freezer) -> None:
+    freezer.move_to(NOW)
+    entry = MockConfigEntry(
+        domain="de_dietrich_smart",
+        unique_id="a1b2c3",
+        data={"username": "julie@example.org", "password": "mot-de-passe"},
+        options={"gas_price": 0.15},
+    )
+    entry.add_to_hass(hass)
+    mock_client.fetch_consumption_days.return_value = [DayConsumption(date(2026, 11, 1), 30.0, 5.0)]
+    mock_client.fetch_consumption_hours.return_value = hours_of(date(2026, 11, 2), 1.0, 0.25)
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    await async_wait_recording_done(hass)
+    assert (await _sums(hass, "de_dietrich_smart:a1b2c3_gas_heating_cost"))[-1] == pytest.approx(54.0 * 0.15)
+    assert (await _sums(hass, "de_dietrich_smart:a1b2c3_gas_dhw_cost"))[-1] == pytest.approx(11.0 * 0.15)
+
+
+async def test_no_cost_statistics_without_price(hass, config_entry, mock_client, freezer) -> None:
+    freezer.move_to(NOW)
+    mock_client.fetch_consumption_days.return_value = [DayConsumption(date(2026, 11, 1), 30.0, 5.0)]
+    assert await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+    await async_wait_recording_done(hass)
+    assert await _sums(hass, "de_dietrich_smart:a1b2c3_gas_heating_cost") == []

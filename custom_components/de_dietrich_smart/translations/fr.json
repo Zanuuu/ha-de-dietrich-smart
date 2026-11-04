@@ -47,14 +47,16 @@
           "connection": "Raccordement du plancher",
           "max_floor_flow": "Départ maximal admissible pour le plancher",
           "base_temp": "Température extérieure de base",
-          "weather_entity": "Prévisions météo"
+          "weather_entity": "Prévisions météo",
+          "gas_price": "Prix du gaz"
         },
         "data_description": {
           "default_duration": "Appliquée quand la température est changée depuis Home Assistant.",
           "connection": "Direct : la courbe de chauffe de la chaudière fixe la température de l'eau du plancher.",
           "max_floor_flow": "Au-delà, à la température de base, une réparation signale une courbe de chauffe dangereuse pour le plancher.",
           "base_temp": "Température extérieure la plus froide prévue pour l'installation (environ −15 °C à la ville).",
-          "weather_entity": "Utilisées par le simulateur de courbe de chauffe."
+          "weather_entity": "Utilisées par le simulateur de courbe de chauffe.",
+          "gas_price": "Prix fixe par kWh. Renseigné, il fait importer des statistiques de coût pour le tableau Énergie (« Utiliser une entité suivant le coût total ») ; tout l'historique est calculé à ce prix."
         }
       }
     }
