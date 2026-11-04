@@ -8,7 +8,13 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import probatio
-from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult, OptionsFlowWithReload
+from homeassistant.config_entries import (
+    ConfigEntry,
+    ConfigEntryState,
+    ConfigFlow,
+    ConfigFlowResult,
+    OptionsFlowWithReload,
+)
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import callback
 from homeassistant.helpers import selector
@@ -27,7 +33,7 @@ from .const import (
     DOMAIN,
     DURATION_CHOICES,
 )
-from .http import client_factory
+from .http import client_factory, user_agent
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,6 +59,7 @@ class DeDietrichConfigFlow(ConfigFlow, domain=DOMAIN):
             password,
             ZoneInfo(self.hass.config.time_zone),
             client_factory=client_factory(self.hass),
+            user_agent=await user_agent(self.hass),
         )
         try:
             await client.start()
@@ -69,6 +76,19 @@ class DeDietrichConfigFlow(ConfigFlow, domain=DOMAIN):
         if not state.appliance:
             return None, {"base": "no_appliance"}
         return state, {}
+
+    async def _validate_for(
+        self, entry: ConfigEntry, username: str, password: str
+    ) -> tuple[State | None, dict[str, str]]:
+        """Validation pour une entrée existante : déchargée le temps de la connexion, le cloud
+        n'acceptant qu'un client. Rechargée en cas d'échec ; en cas de succès, par la mise à jour."""
+        was_loaded = entry.state is ConfigEntryState.LOADED
+        if was_loaded:
+            await self.hass.config_entries.async_unload(entry.entry_id)
+        state, errors = await self._validate(username, password)
+        if was_loaded and not (state and state.appliance and state.appliance.id == entry.unique_id):
+            await self.hass.config_entries.async_setup(entry.entry_id)
+        return state, errors
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
         errors: dict[str, str] = {}
@@ -89,7 +109,7 @@ class DeDietrichConfigFlow(ConfigFlow, domain=DOMAIN):
         entry = self._get_reauth_entry()
         errors: dict[str, str] = {}
         if user_input is not None:
-            state, errors = await self._validate(entry.data[CONF_USERNAME], user_input[CONF_PASSWORD])
+            state, errors = await self._validate_for(entry, entry.data[CONF_USERNAME], user_input[CONF_PASSWORD])
             if state and state.appliance:
                 await self.async_set_unique_id(state.appliance.id)
                 self._abort_if_unique_id_mismatch()
@@ -105,7 +125,7 @@ class DeDietrichConfigFlow(ConfigFlow, domain=DOMAIN):
         entry = self._get_reconfigure_entry()
         errors: dict[str, str] = {}
         if user_input is not None:
-            state, errors = await self._validate(user_input[CONF_USERNAME], user_input[CONF_PASSWORD])
+            state, errors = await self._validate_for(entry, user_input[CONF_USERNAME], user_input[CONF_PASSWORD])
             if state and state.appliance:
                 await self.async_set_unique_id(state.appliance.id)
                 self._abort_if_unique_id_mismatch()

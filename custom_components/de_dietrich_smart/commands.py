@@ -40,6 +40,10 @@ class CommandError(Exception):
     """Commande refusée ou en échec ; message lisible par l'utilisateur."""
 
 
+class CloudRefused(CommandError):
+    """Commande refusée ou perdue par le cloud (pas une saisie invalide)."""
+
+
 @dataclass
 class CommandResult:
     command_id: int
@@ -76,9 +80,16 @@ class CommandRunner:
             raise CommandError("aucune production d'eau chaude connue")
         return d
 
-    @staticmethod
-    def _zone_before(z: Zone) -> dict[str, Any]:
-        return {"mode": z.mode, "setpoint": z.setpoint, "program": z.program, "fireplace": z.fireplace}
+    def _zone_before(self, z: Zone) -> dict[str, Any]:
+        # Retour au programme prévu : rétabli avec la zone si la commande est annulée.
+        pending = next((p for p in self.journal.pendings() if p["params"].get("zone_id") == z.id), None)
+        return {
+            "mode": z.mode,
+            "setpoint": z.setpoint,
+            "program": z.program,
+            "fireplace": z.fireplace,
+            "pending": {k: v for k, v in pending.items() if k != "id"} if pending else None,
+        }
 
     @staticmethod
     def _dhw_before(d: Dhw) -> dict[str, Any]:
@@ -102,7 +113,7 @@ class CommandRunner:
             await coro_factory()
         except SourceError as exc:
             self.journal.finish_command(cid, False, str(exc))
-            raise CommandError(f"la commande n'a pas abouti : {exc}") from exc
+            raise CloudRefused(f"la commande n'a pas abouti : {exc}") from exc
         self.journal.finish_command(cid, True)
         self.coordinator.async_refresh_soon()
         _LOGGER.info("commande %s %s (%s)", action, params, origin)
@@ -478,6 +489,10 @@ class CommandRunner:
                 "annulation", {"command_id": cid}, {}, factory, "Réglage précédent rétabli", undo_of=cid
             )
             self.journal.mark_undone(cid)
+            if (p := b.get("pending")) and p["due"] > time.time():
+                self.journal.add_pending(
+                    p["due"], p["action"], p["params"], p["command_id"], p["expect"], p.get("attempts", 0)
+                )
             return res
 
     def last_undoable(self) -> int | None:

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from functools import partial
+
 from homeassistant.components.number import NumberDeviceClass, NumberEntity, NumberMode
 from homeassistant.const import EntityCategory, UnitOfTemperature
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import DeDietrichConfigEntry
@@ -16,15 +19,32 @@ PARALLEL_UPDATES = 1
 async def async_setup_entry(
     hass: HomeAssistant, entry: DeDietrichConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
-    data = entry.runtime_data.coordinator.data
-    entities: list[NumberEntity] = []
-    if data.zone:
-        if data.zone.heating_curve:
-            entities += [CurveNumber(entry, "slope"), CurveNumber(entry, "base")]
-        entities += [ActivityNumber(entry, a["n"], a.get("name") or str(a["n"])) for a in data.zone.activities]
-    if data.dhw:
-        entities += [DhwNumber(entry, "comfort"), DhwNumber(entry, "reduced")]
-    async_add_entities(entities)
+    coordinator = entry.runtime_data.coordinator
+    added: set[str] = set()
+
+    @callback
+    def _add_new() -> None:
+        """Courbe et activités viennent des lectures complémentaires : ajoutées à la relève qui les apporte."""
+        data = coordinator.data
+        if not data:
+            return
+        found: dict[str, Callable[[], NumberEntity]] = {}
+        if data.zone:
+            if data.zone.heating_curve:
+                found["slope"] = partial(CurveNumber, entry, "slope")
+                found["base"] = partial(CurveNumber, entry, "base")
+            for a in data.zone.activities:
+                found[f"activity_{a['n']}"] = partial(ActivityNumber, entry, a["n"], a.get("name") or str(a["n"]))
+        if data.dhw:
+            found["dhw_comfort"] = partial(DhwNumber, entry, "comfort")
+            found["dhw_reduced"] = partial(DhwNumber, entry, "reduced")
+        new = [make() for key, make in found.items() if key not in added]
+        added.update(found)
+        if new:
+            async_add_entities(new)
+
+    _add_new()
+    entry.async_on_unload(coordinator.async_add_listener(_add_new))
 
 
 class CurveNumber(DeDietrichEntity, NumberEntity):

@@ -8,11 +8,11 @@ from typing import TYPE_CHECKING
 import probatio
 from homeassistant.const import ATTR_CONFIG_ENTRY_ID, ATTR_TEMPERATURE
 from homeassistant.core import HomeAssistant, ServiceCall, callback
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers import service
 
-from .commands import CommandError, CommandResult
+from .commands import CloudRefused, CommandError, CommandResult
 from .const import CONF_DEFAULT_DURATION, DEFAULT_OPTIONS, DOMAIN, DURATION_CHOICES
 
 if TYPE_CHECKING:
@@ -52,6 +52,10 @@ SCHEMAS = {
 async def _run(coro: Awaitable[CommandResult]) -> None:
     try:
         await coro
+    except CloudRefused as exc:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN, translation_key="command_failed", translation_placeholders={"message": str(exc)}
+        ) from exc
     except CommandError as exc:
         raise ServiceValidationError(
             translation_domain=DOMAIN, translation_key="command_failed", translation_placeholders={"message": str(exc)}

@@ -47,6 +47,23 @@ with sync_playwright() as pw:
                 page.wait_for_selector("dd-smart-panel >> dialog[open]")
                 page.screenshot(path=f"{OUT}/editor-{size}-{theme}.png")
             page.close()
+    # Compte non administrateur : aucun bouton d'écriture (le serveur les refuserait).
+    page = browser.new_page(viewport={"width": 390, "height": 844}, device_scale_factor=1, locale="fr-FR")
+    page.on("pageerror", lambda e: problems.append(f"page: {e}"))
+    page.goto(f"{BASE}?user=guest")
+    page.wait_for_selector("dd-smart-panel >> .week")
+    if n := page.locator("dd-smart-panel >> .stepper button").count():
+        problems.append(f"non-admin : {n} boutons de consigne visibles")
+    page.locator("dd-smart-panel >> .wrow").first.click()
+    if page.locator("dd-smart-panel >> dialog[open]").count():
+        problems.append("non-admin : l'éditeur de créneaux s'ouvre")
+        page.keyboard.press("Escape")
+    page.screenshot(path=f"{OUT}/programs-mobile-guest.png", full_page=True)
+    page.locator("dd-smart-panel >> nav button", has_text="Journal").click()
+    page.wait_for_selector("dd-smart-panel >> .journal li")
+    if n := page.locator("dd-smart-panel >> .journal button.link").count():
+        problems.append(f"non-admin : {n} liens « Annuler » visibles")
+    page.close()
     browser.close()
 
 for p in problems:

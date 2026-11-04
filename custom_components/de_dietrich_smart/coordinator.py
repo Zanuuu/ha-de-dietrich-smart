@@ -16,7 +16,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from . import events
 from .bdr.cloud import BdrClient
 from .bdr.models import AuthError, SourceError, State
-from .const import DOMAIN, POLL_INTERVAL, POLL_MAX, REFRESH_SOON
+from .const import DOMAIN, POLL_INTERVAL, POLL_MAX, REFRESH_SOON, UNREACHABLE_AFTER
 from .journal import Journal
 
 if TYPE_CHECKING:
@@ -42,6 +42,8 @@ class DeDietrichCoordinator(DataUpdateCoordinator[State]):
         self.after_poll: list[Callable[[], None]] = []
         self._expect: list[tuple[float, str, Any]] = []
         self._soon: Any = None
+        # Réévaluation des alertes à 15 min d'échec : le backoff espace les relèves au-delà.
+        self._unreachable: Any = None
         # Demande de chauffe relevée à chaque relève, sur la dernière heure : (instant, en chauffe).
         self._demand: deque[tuple[float, bool]] = deque()
 
@@ -50,8 +52,17 @@ class DeDietrichCoordinator(DataUpdateCoordinator[State]):
             return await self._poll()
         finally:
             # Appelés après chaque relève, réussie ou non (les abonnés ne le sont qu'au changement).
-            for fn in self.after_poll:
-                fn()
+            self._notify_after_poll()
+
+    @callback
+    def _notify_after_poll(self) -> None:
+        for fn in self.after_poll:
+            fn()
+
+    def _cancel_unreachable(self) -> None:
+        if self._unreachable:
+            self._unreachable()
+            self._unreachable = None
 
     async def _poll(self) -> State:
         try:
@@ -63,6 +74,7 @@ class DeDietrichCoordinator(DataUpdateCoordinator[State]):
             self.last_error = str(exc)
             if self.failing_since is None:
                 self.failing_since = time.time()
+                self._unreachable = async_call_later(self.hass, UNREACHABLE_AFTER, self._on_unreachable)
             self.update_interval = min(POLL_INTERVAL * 2**self.errors_in_row, POLL_MAX)
             if self.errors_in_row == LOST_AFTER:
                 self.journal.add_event(events.event("connexion", f"Connexion perdue : {exc}", "warning"))
@@ -70,6 +82,7 @@ class DeDietrichCoordinator(DataUpdateCoordinator[State]):
         if self.errors_in_row >= LOST_AFTER:
             self.journal.add_event(events.event("connexion", "Connexion rétablie", "good"))
         self.errors_in_row, self.last_error, self.failing_since = 0, None, None
+        self._cancel_unreachable()
         self.update_interval = POLL_INTERVAL
         prev = self.data
         new_events = events.initial(state) if prev is None else events.diff(prev, state, self._origin)
@@ -111,7 +124,13 @@ class DeDietrichCoordinator(DataUpdateCoordinator[State]):
                 return events.APP_ORIGIN
         return events.EXT_ORIGIN
 
+    @callback
+    def _on_unreachable(self, _now: Any) -> None:
+        self._unreachable = None
+        self._notify_after_poll()
+
     async def async_shutdown(self) -> None:
+        self._cancel_unreachable()
         if self._soon:
             self._soon()
             self._soon = None

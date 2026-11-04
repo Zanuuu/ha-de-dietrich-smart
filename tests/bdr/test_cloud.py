@@ -391,7 +391,7 @@ async def test_client_factory_used(dashboard):
     await src.fetch_state()
     await src.close()
     assert [k["follow_redirects"] for k in made] == [False, True]
-    assert all(c.request.headers["User-Agent"].startswith("ha-de-dietrich-smart/") for c in respx.calls)
+    assert all(c.request.headers["User-Agent"].startswith("ha-de-dietrich-smart") for c in respx.calls)
 
 
 @respx.mock
@@ -431,3 +431,16 @@ async def test_login_refused_is_not_retried(src):
         await src.fetch_consumption_days("a1", date(2026, 11, 1), date(2026, 11, 2))
     await src.close()
     assert form.call_count == calls == 1
+
+
+@respx.mock
+async def test_user_agent_given_by_caller(dashboard):
+    """La version annoncée au cloud est celle que fournit l'intégration (son manifest)."""
+    mock_login(respx)
+    respx.get(f"{b.API}/homes/dashboard").mock(return_value=httpx.Response(200, json=dashboard))
+    respx.get(url__regex=rf"{b.API}/.*").mock(return_value=httpx.Response(404))
+    src = b.BdrClient("julie@example.org", "mot-de-passe", TZ, user_agent="ha-de-dietrich-smart/9.9.9")
+    await src.start()
+    await src.fetch_state()
+    await src.close()
+    assert {c.request.headers["User-Agent"] for c in respx.calls} == {"ha-de-dietrich-smart/9.9.9"}

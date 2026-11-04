@@ -79,6 +79,24 @@ async def test_undo_window(rt, mock_client, freezer):
         await rt.commands.undo(res.command_id)
 
 
+async def test_undo_return_to_schedule_restores_pending(rt, mock_client, state, freezer):
+    """Consigne 2 h puis « Retour au programme » annulé : le retour prévu revient à la même heure."""
+    freezer.move_to("2026-11-04 10:00:00+00:00")
+    await rt.commands.set_setpoint(20, "2h")
+    (pending,) = rt.journal.pendings()
+    manual = copy.deepcopy(state)
+    manual.zone.mode, manual.zone.setpoint = "manual", 20.0
+    rt.coordinator.async_set_updated_data(manual)
+    freezer.tick(timedelta(minutes=10))
+    res = await rt.commands.set_mode("schedule")
+    assert rt.journal.pendings() == []
+    await rt.commands.undo(res.command_id)
+    mock_client.zone_manual.assert_awaited_with("z1", 20.0)
+    (restored,) = rt.journal.pendings()
+    assert restored["due"] == pending["due"] and restored["params"] == pending["params"]
+    assert restored["expect"] == pending["expect"]
+
+
 async def test_undo_only_last_command(rt):
     first = await rt.commands.set_dhw_mode("eco")
     await rt.commands.set_dhw_mode("comfort")

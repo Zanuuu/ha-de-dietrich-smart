@@ -12,8 +12,16 @@ from functools import partial
 
 import httpx
 from homeassistant.core import HomeAssistant
+from homeassistant.loader import async_get_integration
 from homeassistant.util.ssl import client_context
+
+from .const import DOMAIN
 
 
 def client_factory(hass: HomeAssistant) -> Callable[..., httpx.AsyncClient]:
     return partial(httpx.AsyncClient, verify=client_context())
+
+
+async def user_agent(hass: HomeAssistant) -> str:
+    """En-tête annoncé au cloud, à la version du manifest."""
+    return f"ha-de-dietrich-smart/{(await async_get_integration(hass, DOMAIN)).version}"

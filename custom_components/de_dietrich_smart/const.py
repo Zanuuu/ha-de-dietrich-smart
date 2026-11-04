@@ -8,6 +8,8 @@ DOMAIN: Final = "de_dietrich_smart"
 # Relève du cloud : 60 s, doublée à chaque échec jusqu'à 15 min.
 POLL_INTERVAL: Final = timedelta(seconds=60)
 POLL_MAX: Final = timedelta(seconds=900)
+# Cloud injoignable : signalé après 15 min sans relève réussie (en secondes).
+UNREACHABLE_AFTER: Final = 900
 # Relève anticipée après une commande.
 REFRESH_SOON: Final = 6.0
 # Fenêtre d'annulation d'une commande.

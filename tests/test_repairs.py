@@ -76,3 +76,43 @@ async def test_cloud_unreachable_after_15_min(hass, loaded, config_entry, mock_c
     async_fire_time_changed(hass)
     await hass.async_block_till_done()
     assert issue(hass, config_entry, "cloud_unreachable") is None
+
+
+async def test_cloud_unreachable_at_15_min_despite_backoff(hass, loaded, config_entry, mock_client, freezer):
+    """Relèves espacées (2, 6, 14, 29 min) : l'alerte tombe quand même à 15 min, pas à la relève suivante."""
+    loaded.coordinator.async_add_listener(lambda: None)
+    mock_client.fetch_state.side_effect = SourceError("cloud BDR injoignable")
+    freezer.tick(loaded.coordinator.update_interval)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    elapsed = 0.0
+    while elapsed + loaded.coordinator.update_interval.total_seconds() <= 900:
+        elapsed += loaded.coordinator.update_interval.total_seconds()
+        freezer.tick(loaded.coordinator.update_interval)
+        async_fire_time_changed(hass)
+        await hass.async_block_till_done()
+    assert issue(hass, config_entry, "cloud_unreachable") is None
+    freezer.tick(901 - elapsed)
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert issue(hass, config_entry, "cloud_unreachable") is not None
+
+
+async def test_curve_without_base(hass, loaded, config_entry, state):
+    """Courbe sans pied (baseSetpoint absent) : ni exception, ni alerte, départ calculé inconnu."""
+    from custom_components.de_dietrich_smart.sensor import _curve_flow
+
+    await with_curve(hass, loaded, state, 1.5, None)
+    assert issue(hass, config_entry, "unsafe_floor_curve") is None
+    assert _curve_flow(loaded.coordinator.data) is None
+
+
+async def test_entry_removal_cleans_up(hass, hass_storage, loaded, config_entry):
+    """Suppression de l'intégration : plus d'alerte orpheline ni de fichier .storage."""
+    await loaded.consumption.async_save()
+    await loaded.journal.async_save()
+    assert issue(hass, config_entry, "unsafe_floor_curve") is not None
+    assert await hass.config_entries.async_remove(config_entry.entry_id)
+    await hass.async_block_till_done()
+    assert not [i for i in ir.async_get(hass).issues.values() if i.domain == DOMAIN]
+    assert not [k for k in hass_storage if config_entry.entry_id in k]

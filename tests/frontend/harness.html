@@ -29,7 +29,7 @@
   const activities = [[1, 'Nuit', 18], [2, 'Maison', 19], [3, 'Absent', 16], [4, 'Matin', 19], [5, 'Soir', 19]]
     .map(([n, name, setpoint]) => ({ n, name, setpoint, min: 5, max: 30, step: 0.5 }));
   const now = Date.now() / 1000;
-  const overview = { entries: [{ entry_id: 'e1', title: 'EMC-S 24/28 MI', undo: { command_id: 12, undo_until: now + 90, action: 'activite' },
+  const overview = { entries: [{ entry_id: 'e1', title: 'EMC-S 24/28 MI', undo: { command_id: 12, undo_until: now + 90, undo_remaining: 90, action: 'activite' },
     state: { appliances: [{ id: 'a1', name: 'EMC-S 24/28 MI',
       zones: [{ id: 'z1', name: 'Séjour', program: 2, programs: [1, 2, 3], mode: 'schedule', setpoint: 19, room_temp: 19.5,
         week: { 1: p1, 2: p2, 3: [] }, activities }],
@@ -46,10 +46,12 @@
       { id: 10, ts: now - 9000, action: 'programme', params: { program: 3 }, ok: false, error: 'HTTP 500', origin: 'Home Assistant', undone: false }] };
   window.hass = {
     config: { time_zone: 'Europe/Paris' },
+    // ?user=guest : compte non administrateur (lecture seule).
+    user: { name: 'Julie', is_admin: q.get('user') !== 'guest' },
     callWS: async (msg) => {
       if (msg.type.endsWith('/overview')) return overview;
       if (msg.type.endsWith('/journal')) return journal;
-      return { command_id: 13, message: 'Programme 2 modifié : lundi', undo_until: now + 120 };
+      return { command_id: 13, message: 'Programme 2 modifié : lundi', undo_until: now + 120, undo_remaining: 120 };
     },
   };
   await import('../../custom_components/de_dietrich_smart/frontend/dd-smart-panel.js');

@@ -4,7 +4,9 @@ import copy
 from datetime import date
 
 import pytest
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+
+from custom_components.de_dietrich_smart.bdr.models import SourceError
 
 DOMAIN = "de_dietrich_smart"
 
@@ -70,3 +72,12 @@ async def test_undo_last_command(hass, loaded, config_entry, mock_client):
 async def test_unknown_entry(hass, loaded):
     with pytest.raises(ServiceValidationError):
         await hass.services.async_call(DOMAIN, "cancel_holiday", {"config_entry_id": "nope"}, blocking=True)
+
+
+async def test_cloud_refusal_is_not_a_validation_error(hass, loaded, config_entry, mock_client):
+    """Refus du cloud : erreur d'exécution, pas une saisie invalide de l'utilisateur."""
+    mock_client.zone_override.side_effect = SourceError("HTTP 500")
+    with pytest.raises(HomeAssistantError) as err:
+        await call(hass, config_entry, "set_override", temperature=19)
+    assert not isinstance(err.value, ServiceValidationError)
+    assert "HTTP 500" in err.value.translation_placeholders["message"]

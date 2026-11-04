@@ -128,6 +128,8 @@ class DdSmartPanel extends LitElement {
   get _appl() { return this._entry?.state?.appliances?.[0]; }
   get _zone() { return this._appl?.zones?.[0]; }
   get _dhw() { return this._appl?.dhw?.[0]; }
+  // Écritures réservées aux administrateurs (le serveur les refuse aux autres).
+  get _admin() { return this.hass?.user?.is_admin !== false; }
   get _acts() { return Object.fromEntries((this._zone?.activities || []).map((a) => [a.n, a])); }
 
   _today() {
@@ -154,7 +156,7 @@ class DdSmartPanel extends LitElement {
   async _command(msg) {
     try {
       const res = await this._ws({ ...msg, entry_id: this._entryId });
-      this._showToast(res.message, res.undo_until ? res.command_id : null, res.undo_until);
+      this._showToast(res.message, res.undo_remaining ? res.command_id : null, res.undo_remaining);
       setTimeout(() => this._load(), 8000);
       return res;
     } catch (e) {
@@ -163,10 +165,11 @@ class DdSmartPanel extends LitElement {
     }
   }
 
-  _showToast(text, commandId = null, undoUntil = null, error = false) {
+  _showToast(text, commandId = null, undoRemaining = null, error = false) {
     clearTimeout(this._toastTimer);
     this._toast = { text, commandId, error };
-    const ms = undoUntil ? Math.max(4000, undoUntil * 1000 - Date.now()) : 6000;
+    // Délai restant donné par le serveur : l'horloge du navigateur peut être décalée.
+    const ms = undoRemaining ? Math.max(4000, undoRemaining * 1000) : 6000;
     this._toastTimer = setTimeout(() => { this._toast = null; }, ms);
   }
 
@@ -320,24 +323,24 @@ class DdSmartPanel extends LitElement {
             ${WEEK_ORDER.map((day) => this._weekRow(day, daySegments(week, day), A, active))}
           </div>
           <div class="scale" aria-hidden="true"><span>0 h</span><span>6 h</span><span>12 h</span><span>18 h</span><span>24 h</span></div>
-          <p class="help">Touchez un jour pour modifier ses créneaux.</p>`
+          <p class="help">${this._admin ? 'Touchez un jour pour modifier ses créneaux.' : 'Lecture seule : les modifications sont réservées aux administrateurs.'}</p>`
           : html`<p class="muted">Programme ${n} pas encore lu sur le cloud.</p>`}
       </section>
       ${(z.activities || []).length ? html`
         <section class="card">
           <h2>Consignes des activités</h2>
-          <p class="help">Lues sur le thermostat ; une modification ici s'applique au thermostat.</p>
+          <p class="help">Lues sur le thermostat${this._admin ? " ; une modification ici s'applique au thermostat" : ''}.</p>
           <ul class="acts">
             ${z.activities.map((a) => {
               const v = this._actWanted[a.n] ?? a.setpoint;
               return html`<li class=${used.has(a.n) ? '' : 'unused'}>
                 <span class="sw" style="--i:${intensity(v)}%" aria-hidden="true"></span>
                 <span class="lbl">${a.name}<span class="help">${this._actWanted[a.n] != null ? 'envoi…' : used.has(a.n) ? '' : `pas dans le programme ${n}`}</span></span>
-                <span class="stepper">
+                ${this._admin ? html`<span class="stepper">
                   <button aria-label="Baisser la consigne ${a.name}" @click=${() => this._actBump(a.n, -1)}>−</button>
                   <span class="v" aria-live="polite">${fDeg(v)}</span>
                   <button aria-label="Monter la consigne ${a.name}" @click=${() => this._actBump(a.n, 1)}>+</button>
-                </span>
+                </span>` : html`<span class="stepper"><span class="v">${fDeg(v)}</span></span>`}
               </li>`;
             })}
           </ul>
@@ -363,7 +366,7 @@ class DdSmartPanel extends LitElement {
     const said = segs.map((g) => `${hm(g.start)} ${name(g.sp)} ${temp(g.sp) == null ? '' : fDeg(temp(g.sp))}`.trim()).join(', ');
     const wide = this.narrow ? 30 : 13;
     return html`<button class="wrow ${day === today ? 'today' : ''}" role="listitem"
-        aria-label="${DAYS[day]} : ${said || 'aucun créneau'}. Modifier" @click=${() => this._openEditor('zone', day)}>
+        aria-label="${DAYS[day]} : ${said || 'aucun créneau'}${this._admin ? '. Modifier' : ''}" @click=${() => this._admin && this._openEditor('zone', day)}>
       <span class="wday">${DAYS_S[day]}</span>
       <span class="band">
         ${segs.map((g) => {
@@ -380,7 +383,7 @@ class DdSmartPanel extends LitElement {
     const today = this._today();
     const said = segs.filter((g) => g.sp.comfort).map((g) => `confort ${hm(g.start)}–${hm(g.end)}`).join(', ');
     return html`<button class="wrow ${day === today ? 'today' : ''}" role="listitem"
-        aria-label="${DAYS[day]} : ${said || 'réduit toute la journée'}. Modifier" @click=${() => this._openEditor('dhw', day)}>
+        aria-label="${DAYS[day]} : ${said || 'réduit toute la journée'}${this._admin ? '. Modifier' : ''}" @click=${() => this._admin && this._openEditor('dhw', day)}>
       <span class="wday">${DAYS_S[day]}</span>
       <span class="band">${segs.map((g) => {
         const w = ((g.end - g.start) / 1440) * 100;
@@ -492,7 +495,7 @@ class DdSmartPanel extends LitElement {
     else if (c.action === 'ecs_creneaux') what += ` : ${daysLabel(p.days)}`;
     else if (c.action === 'vacances') what += p.start ? ` : départ le ${p.start}, retour le ${p.end}` : ' annulées';
     const who = [c.origin, c.ok === false ? `échec : ${c.error}` : null, c.undone ? 'annulée' : null].filter(Boolean).join(' · ');
-    const undoable = this._entry?.undo?.command_id === c.id;
+    const undoable = this._admin && this._entry?.undo?.command_id === c.id;
     return html`<li><span class="dot ${c.ok === false ? 'critical' : 'good'}"></span>
       <span class="what">${what}<span class="who">${who}</span></span>
       <span class="when">${this._when(c.ts)}${undoable ? html`<button class="link" @click=${() => this._undo(c.id)}>Annuler</button>` : nothing}</span></li>`;
