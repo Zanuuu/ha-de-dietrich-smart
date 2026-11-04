@@ -184,6 +184,18 @@
       },
       "target_temperature": {
         "name": "Consigne"
+      },
+      "curve_recommendation": {
+        "name": "Recommandation de courbe",
+        "state": {
+          "keep": "Garder la courbe",
+          "raise_base": "Monter le pied",
+          "lower_base": "Baisser le pied",
+          "raise_slope": "Monter la pente",
+          "lower_slope": "Baisser la pente",
+          "switch_to_floor": "Passer à une courbe de plancher",
+          "insufficient_data": "Données insuffisantes"
+        }
       }
     },
     "binary_sensor": {

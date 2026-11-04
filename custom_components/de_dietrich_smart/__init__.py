@@ -18,6 +18,7 @@ from .bdr.cloud import BdrClient
 from .commands import CommandRunner
 from .const import DOMAIN
 from .coordinator import DeDietrichCoordinator
+from .curve.coordinator import DiagnosticCoordinator
 from .devices import appliance_device_info
 from .energy import ConsumptionCoordinator
 from .http import client_factory, user_agent
@@ -46,6 +47,7 @@ class RuntimeData:
     commands: CommandRunner
     device_id: str
     consumption: ConsumptionCoordinator
+    diagnostic: DiagnosticCoordinator
 
 
 type DeDietrichConfigEntry = ConfigEntry[RuntimeData]
@@ -85,6 +87,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -
     # Fiche de la chaudière enregistrée d'emblée : la zone et l'eau chaude s'y rattachent.
     device = dr.async_get(hass).async_get_or_create(config_entry_id=entry.entry_id, **appliance_device_info(appliance))
     consumption = ConsumptionCoordinator(hass, entry, client, coordinator)
+    diagnostic = DiagnosticCoordinator(hass, entry, coordinator)
     entry.runtime_data = RuntimeData(
         client=client,
         coordinator=coordinator,
@@ -92,6 +95,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -
         commands=commands,
         device_id=device.id,
         consumption=consumption,
+        diagnostic=diagnostic,
     )
     await consumption.async_load()
     # La consommation ne bloque pas le chargement : elle sera relue à l'heure suivante.
@@ -99,11 +103,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -
     # Relève horaire même sans capteur abonné (« gaz du jour » désactivé) : l'import en dépend.
     entry.async_on_unload(consumption.async_add_listener(lambda: None))
     entry.async_on_unload(consumption.async_save)
+    # Diagnostic de la courbe : lu dans l'enregistreur, un échec ne bloque pas le chargement.
+    await diagnostic.async_refresh()
+    entry.async_on_unload(diagnostic.async_add_listener(lambda: None))
 
     @callback
     def _on_data() -> None:
         """Nouvel état publié (relève réussie ou après une commande)."""
         async_update_issues(hass, entry)
+        diagnostic.async_on_state()
         entry.async_create_background_task(hass, commands.async_run_pending(), "de_dietrich_smart_pending")
 
     @callback

@@ -184,6 +184,18 @@
       },
       "target_temperature": {
         "name": "Setpoint"
+      },
+      "curve_recommendation": {
+        "name": "Curve recommendation",
+        "state": {
+          "keep": "Keep the curve",
+          "raise_base": "Raise the base",
+          "lower_base": "Lower the base",
+          "raise_slope": "Raise the slope",
+          "lower_slope": "Lower the slope",
+          "switch_to_floor": "Switch to a floor curve",
+          "insufficient_data": "Not enough data"
+        }
       }
     },
     "binary_sensor": {
