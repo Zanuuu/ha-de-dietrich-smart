@@ -20,6 +20,7 @@ from .const import (
     CONF_CONNECTION,
     CONF_DEFAULT_DURATION,
     CONF_EMITTER,
+    CONF_GAS_PRICE,
     CONF_MAX_FLOOR_FLOW,
     CONF_WEATHER_ENTITY,
     DEFAULT_OPTIONS,
@@ -140,6 +141,11 @@ OPTIONS_SCHEMA = probatio.Schema(
         ),
         probatio.Optional(CONF_WEATHER_ENTITY): selector.EntitySelector(
             selector.EntitySelectorConfig(domain="weather")
+        ),
+        probatio.Optional(CONF_GAS_PRICE): selector.NumberSelector(
+            selector.NumberSelectorConfig(
+                min=0, max=2, step="any", unit_of_measurement="€/kWh", mode=selector.NumberSelectorMode.BOX
+            )
         ),
     }
 )
