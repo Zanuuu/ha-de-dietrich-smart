@@ -123,7 +123,7 @@
         "state": {
           "schedule": "Schedule",
           "comfort": "Comfort",
-          "eco": "Eco (frost protection)"
+          "eco": "Eco"
         }
       }
     },

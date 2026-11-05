@@ -9,7 +9,8 @@ Remeha Home apps.
 - **Climate** entity for the heating zone: setpoint, schedule / manual / frost protection /
   fireplace presets, heating demand. A setpoint change lasts until the next switch by default
   (1 h, 2 h or permanent in the options).
-- **Water heater** entity: schedule, comfort or eco mode, comfort setpoint, boost button.
+- **Water heater** entity: schedule, comfort or eco mode, comfort setpoint, boost button, and the
+  setpoint reported by the cloud (`active_setpoint`).
 - **Sensors**: room and outdoor temperature, water pressure, boiler activity, error status and
   fault code (with the meaning and advice from the EMC-S manual), next switch, override end,
   heating ratio over the last hour, flow temperature from the heating curve, current setpoint
@@ -83,6 +84,9 @@ Requires Home Assistant 2026.10 or later.
 
 ## Limitations
 
+- On an instantaneous (combi) boiler, the cloud reports no hot water temperature: the water heater
+  has no current temperature, which is expected. In eco mode the boiler still produces hot water on
+  demand.
 - The cloud API is unofficial (documented by [msvisser/remeha_home](https://github.com/msvisser/remeha_home)).
   It may change without notice.
 - **One client only**: gateways are reported to drop when two clients poll the same account.

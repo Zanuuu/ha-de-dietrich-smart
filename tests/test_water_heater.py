@@ -19,6 +19,16 @@ async def test_state(hass, loaded):
     assert s.attributes["min_temp"] == 40.0 and s.attributes["max_temp"] == 65.0
 
 
+async def test_instant_boiler_has_no_water_temperature(hass, loaded, state):
+    b = copy.deepcopy(state)
+    b.dhw.temp = None
+    b.dhw.target = 45.0
+    await push(hass, loaded, b)
+    s = hass.states.get(ENTITY)
+    assert s.attributes["current_temperature"] is None
+    assert s.attributes[ATTR_TEMPERATURE] == 55.0 and s.attributes["active_setpoint"] == 45.0
+
+
 async def test_dhw_operation_eco(hass, loaded, mock_client):
     await hass.services.async_call(
         WATER_HEATER, "set_operation_mode", {ATTR_ENTITY_ID: ENTITY, "operation_mode": "eco"}, blocking=True

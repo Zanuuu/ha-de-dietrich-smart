@@ -14,7 +14,7 @@ ZONE_MODE_FR = {"schedule": "Programme", "override": "Dérogation", "manual": "M
 DHW_MODE_FR = {
     "schedule": "Programme",
     "comfort": "Confort permanent",
-    "eco": "Éco (hors-gel)",
+    "eco": "Éco",
     "boost": "Boost",
     "off": "Arrêt",
 }
