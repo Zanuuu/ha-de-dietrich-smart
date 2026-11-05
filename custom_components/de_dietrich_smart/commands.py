@@ -476,15 +476,22 @@ class CommandRunner:
                                 await self.client.dhw_reduced_setpoint(d.id, old)
 
                 factory = restore_dhw
+                if action == "ecs_mode" and b.get("mode"):
+                    self.coordinator.expect(f"{d.id}:mode", b["mode"])
+                elif action == "ecs_consigne":
+                    attr = "comfort_setpoint" if cmd["params"]["kind"] == "comfort" else "reduced_setpoint"
+                    self.coordinator.expect(f"{d.id}:{attr}", b.get(attr))
             elif action == "activite":
                 z = self._zone()
                 n, old = cmd["params"]["activity"], b.get("setpoint")
                 if old is None:
                     raise CommandError("consigne précédente inconnue, annulation impossible")
                 factory = lambda: self.client.zone_activities(z.id, {n: old})  # noqa: E731
+                self.coordinator.expect(f"{z.id}:activity:{n}", old)
             elif action == "courbe":
                 z = self._zone()
                 factory = lambda: self.client.zone_heating_curve(z.id, b["slope"], b["base"])  # noqa: E731
+                self.coordinator.expect(f"{z.id}:curve", (b["slope"], b["base"]))
             elif action == "creneaux":
                 z, n, old_week = self._zone(), cmd["params"]["program"], b["week"]
                 factory = lambda: self.client.zone_week(z.id, n, old_week)  # noqa: E731

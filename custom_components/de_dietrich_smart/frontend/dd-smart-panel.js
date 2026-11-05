@@ -12,7 +12,7 @@ const MAX_PER_DAY = 6;
 const MODE = { schedule: 'programme', override: 'dérogation', manual: 'manuel', antifrost: 'hors-gel' };
 const DHW_MODE = { schedule: 'programme', comfort: 'confort permanent', eco: 'éco', boost: 'boost', off: 'arrêt' };
 const KINDS = [['', 'Tout'], ['defaut', 'Défauts'], ['pression', 'Pression'], ['mode', 'Modes'], ['consigne', 'Consignes'],
-  ['ecs', 'Eau chaude'], ['connexion', 'Connexion'], ['reglage', 'Réglages'], ['programme', 'Programmes']];
+  ['ecs', 'Eau chaude'], ['connexion', 'Connexion'], ['reglage', 'Réglages'], ['programme', 'Programmes'], ['nourrice', 'Nourrice']];
 const ACTION = { consigne: 'Consigne', mode: 'Mode', programme: 'Programme', cheminee: 'Mode cheminée', ecs_mode: 'Mode eau chaude',
   ecs_consigne: 'Consigne eau chaude', ecs_boost: 'Boost eau chaude', activite: 'Activité', courbe: 'Courbe de chauffe',
   vacances: 'Vacances', creneaux: 'Créneaux', ecs_creneaux: 'Créneaux eau chaude', annulation: 'Annulation' };
@@ -92,6 +92,9 @@ class DdSmartPanel extends LitElement {
     _sim: { state: true },
     _simSource: { state: true },
     _conso: { state: true },
+    _bal: { state: true },
+    _balDraft: { state: true },
+    _balReadings: { state: true },
   };
 
   constructor() {
@@ -148,6 +151,7 @@ class DdSmartPanel extends LitElement {
       if (this._tab === 'journal') await this._loadJournal();
       if (this._tab === 'curve') await this._loadCurve();
       if (this._tab === 'conso') await this._loadConso();
+      if (this._tab === 'balancing') await this._loadBalancing();
     } catch (e) {
       this._error = e.message || String(e);
     }
@@ -164,6 +168,7 @@ class DdSmartPanel extends LitElement {
     if (k === 'journal') this._loadJournal();
     if (k === 'curve') this._loadCurve();
     if (k === 'conso') this._loadConso();
+    if (k === 'balancing') this._loadBalancing();
   }
 
   async _loadCurve() {
@@ -175,6 +180,69 @@ class DdSmartPanel extends LitElement {
   async _loadConso() {
     if (!this._entryId) return;
     this._conso = await this._ws({ type: `${T}/consumption`, entry_id: this._entryId });
+  }
+
+  // --- Nourrice ---------------------------------------------------------------
+
+  async _loadBalancing() {
+    if (!this._entryId) return;
+    this._bal = await this._ws({ type: `${T}/balancing/status`, entry_id: this._entryId });
+    if (!this._bal.rooms.length && this._admin && !this._balDraft) await this._balPropose();
+  }
+
+  // Brouillon tiré des zones de HA : rien n'est enregistré avant « Enregistrer ».
+  async _balPropose() {
+    const p = await this._ws({ type: `${T}/balancing/propose`, entry_id: this._entryId });
+    this._balDraft = { rooms: p.rooms, graduation: this._bal.graduation };
+  }
+
+  async _balCall(action, extra = {}) {
+    try {
+      this._bal = await this._ws({ type: `${T}/balancing/${action}`, entry_id: this._entryId, ...extra });
+      return true;
+    } catch (e) {
+      this._showToast(e.message || String(e), null, null, true);
+      return false;
+    }
+  }
+
+  _balEdit(change) {
+    const d = structuredClone(this._balDraft);
+    change(d);
+    this._balDraft = d;
+  }
+
+  _balAddRoom(d) {
+    d.rooms.push({ id: `piece-${Date.now()}`, name: '', target: 19, climate: null, zones: [{ name: 'Pièce', sensors: [] }], loops: [] });
+  }
+
+  // Regrouper : la pièce devient des zones et des boucles de l'autre pièce.
+  _balMerge(d, from, into) {
+    const room = d.rooms[from], target = d.rooms[into];
+    target.zones.push(...room.zones);
+    target.loops.push(...room.loops);
+    target.climate ??= room.climate;
+    d.rooms.splice(from, 1);
+  }
+
+  _balMove(d, r, z, s, dest) {
+    const [dr, dz] = dest.split(':').map(Number);
+    const [sensor] = d.rooms[r].zones[z].sensors.splice(s, 1);
+    d.rooms[dr].zones[dz].sensors.push(sensor);
+  }
+
+  async _balSaveSetup() {
+    const { rooms, graduation } = this._balDraft;
+    if (await this._balCall('save_setup', { rooms, graduation })) this._balDraft = null;
+  }
+
+  async _balSaveReadings() {
+    const b = this._bal, readings = {};
+    b.rooms.flatMap((r) => r.loops).forEach((l) => {
+      const v = this._balReadings?.[l.label] ?? b.readings[l.label];
+      if (v != null && v !== '') readings[l.label] = Number(v);
+    });
+    if (await this._balCall('save_readings', { readings })) this._balReadings = null;
   }
 
   // Export CSV : fichier préparé par le serveur, enregistré par le navigateur (BOM pour Excel).
@@ -408,7 +476,7 @@ class DdSmartPanel extends LitElement {
           </select>` : nothing}
       </div>
       <nav class="tabs" role="tablist">
-        ${[['programs', 'Programmes'], ['curve', 'Courbe'], ['conso', 'Consommation'], ['journal', 'Journal']].map(([k, l]) => html`
+        ${[['programs', 'Programmes'], ['curve', 'Courbe'], ['conso', 'Consommation'], ['balancing', 'Nourrice'], ['journal', 'Journal']].map(([k, l]) => html`
           <button role="tab" aria-selected=${this._tab === k} class=${this._tab === k ? 'on' : ''}
             @click=${() => { this._tab = k; this._loadTab(k); }}>${l}</button>`)}
       </nav>
@@ -418,7 +486,8 @@ class DdSmartPanel extends LitElement {
           : !this._entries.length ? html`<div class="card muted">Aucune chaudière configurée.</div>`
           : this._tab === 'programs' ? this._renderPrograms()
           : this._tab === 'curve' ? this._renderCurve()
-          : this._tab === 'conso' ? this._renderConso() : this._renderJournal()}
+          : this._tab === 'conso' ? this._renderConso()
+          : this._tab === 'balancing' ? this._renderBalancing() : this._renderJournal()}
       </main>
       ${this._editor ? this._renderEditor() : nothing}
       ${this._confirm ? this._renderConfirm() : nothing}
@@ -779,6 +848,159 @@ class DdSmartPanel extends LitElement {
     </dialog>`;
   }
 
+  _renderBalancing() {
+    const b = this._bal;
+    if (!b) return html`<div class="card muted">Chargement…</div>`;
+    const ready = !this._balDraft && b.rooms.length;
+    return html`
+      ${this._balDraft ? this._renderBalSetup() : this._renderBalRooms()}
+      ${ready ? this._renderBalThermostat() : nothing}
+      ${ready && b.thermostat_room && b.objective ? this._renderBalReadings() : nothing}
+      ${ready && b.start_point ? this._renderBalStart() : nothing}
+    `;
+  }
+
+  _renderBalRooms() {
+    const b = this._bal;
+    if (!b.rooms.length) return html`<section class="card bal"><h2>Pièces et sondes</h2><p class="help">Aucune pièce enregistrée.</p></section>`;
+    return html`<section class="card bal">
+      <div class="head"><h2>Pièces et sondes</h2>
+        ${this._admin ? html`<button @click=${() => { this._balDraft = { rooms: structuredClone(b.rooms), graduation: b.graduation }; }}>Modifier</button>` : nothing}
+      </div>
+      <ul class="bal-sum">${b.rooms.map((r) => html`<li>
+        <b>${r.name}</b> · cible ${fDeg(r.target)}
+        <span class="help">Boucles : ${r.loops.map((l) => `${l.label} (${fNum(l.length, 1)} m)`).join(', ')}</span>
+        <span class="help">${r.zones.map((z) => `${z.name} : ${z.sensors.map((s) => this._balSensorName(s.entity_id)).join(', ') || 'aucune sonde'}`).join(' · ')}</span>
+      </li>`)}</ul>
+    </section>`;
+  }
+
+  _balSensorName(id) { return this._bal.sensors.find((s) => s.entity_id === id)?.name ?? id; }
+
+  _renderBalSetup() {
+    const b = this._bal, d = this._balDraft;
+    const used = new Set(d.rooms.flatMap((r) => r.zones.flatMap((z) => z.sensors.map((s) => s.entity_id))));
+    const free = b.sensors.filter((s) => !used.has(s.entity_id));
+    const zones = d.rooms.flatMap((r, ri) => r.zones.map((z, zi) => ({ key: `${ri}:${zi}`, label: r.zones.length > 1 ? `${r.name} · ${z.name}` : (r.name || 'Nouvelle pièce') })));
+    return html`<section class="card bal">
+      <h2>Pièces et sondes</h2>
+      <p class="help">Proposition tirée des zones de Home Assistant, à corriger : tout reste modifiable, et rien n'est enregistré avant « Enregistrer ». Ajoutez les boucles de chaque pièce.</p>
+      <p class="help">Correction d'une sonde : à régler après avoir posé deux sondes côte à côte quelques heures, car leur écart fausserait la comparaison entre pièces.</p>
+      ${d.rooms.map((r, ri) => html`<div class="bal-room">
+        <div class="bal-row">
+          <label class="grow">Pièce<input .value=${r.name} @change=${(e) => this._balEdit((x) => { x.rooms[ri].name = e.target.value; })}></label>
+          <label>Cible (°C)<input type="number" step="0.5" min="5" max="30" .value=${String(r.target)} @change=${(e) => this._balEdit((x) => { x.rooms[ri].target = Number(e.target.value); })}></label>
+          <label class="grow">Climatiseur<select @change=${(e) => this._balEdit((x) => { x.rooms[ri].climate = e.target.value || null; })}>
+            <option value="" ?selected=${!r.climate}>Aucun</option>
+            ${b.climates.map((c) => html`<option value=${c.entity_id} ?selected=${c.entity_id === r.climate}>${c.name}</option>`)}
+          </select></label>
+        </div>
+        <h4>Boucles</h4>
+        ${r.loops.map((l, li) => html`<div class="bal-row">
+          <label class="grow">Nom<input .value=${l.label} @change=${(e) => this._balEdit((x) => { x.rooms[ri].loops[li].label = e.target.value; })}></label>
+          <label>Longueur en mètres linéaires<input type="number" min="1" step="1" .value=${String(l.length)} @change=${(e) => this._balEdit((x) => { x.rooms[ri].loops[li].length = Number(e.target.value); })}></label>
+          <button aria-label="Retirer la boucle ${l.label}" @click=${() => this._balEdit((x) => { x.rooms[ri].loops.splice(li, 1); })}>Retirer</button>
+        </div>`)}
+        <button @click=${() => this._balEdit((x) => { x.rooms[ri].loops.push({ label: '', length: 50 }); })}>Ajouter une boucle</button>
+        <h4>Zones et sondes</h4>
+        ${r.zones.map((z, zi) => html`<div class="bal-zone">
+          <div class="bal-row">
+            <label class="grow">Zone<input .value=${z.name} @change=${(e) => this._balEdit((x) => { x.rooms[ri].zones[zi].name = e.target.value; })}></label>
+            ${r.zones.length > 1 && !z.sensors.length ? html`<button @click=${() => this._balEdit((x) => { x.rooms[ri].zones.splice(zi, 1); })}>Retirer la zone</button>` : nothing}
+          </div>
+          ${z.sensors.map((s, si) => html`<div class="bal-row">
+            <span class="grow bal-name">${this._balSensorName(s.entity_id)}</span>
+            <label>Correction (°C)<input type="number" step="0.1" min="-5" max="5" .value=${String(s.correction)} @change=${(e) => this._balEdit((x) => { x.rooms[ri].zones[zi].sensors[si].correction = Number(e.target.value); })}></label>
+            <label>Déplacer<select aria-label="Déplacer ${this._balSensorName(s.entity_id)}" @change=${(e) => this._balEdit((x) => this._balMove(x, ri, zi, si, e.target.value))}>
+              ${zones.map((o) => html`<option value=${o.key} ?selected=${o.key === `${ri}:${zi}`}>${o.label}</option>`)}
+            </select></label>
+            <button aria-label="Retirer ${this._balSensorName(s.entity_id)}" @click=${() => this._balEdit((x) => { x.rooms[ri].zones[zi].sensors.splice(si, 1); })}>Retirer</button>
+          </div>`)}
+          ${free.length ? html`<select aria-label="Ajouter une sonde à ${z.name}" @change=${(e) => { const id = e.target.value; e.target.value = ''; if (id) this._balEdit((x) => { x.rooms[ri].zones[zi].sensors.push({ entity_id: id, correction: 0 }); }); }}>
+            <option value="">Ajouter une sonde…</option>
+            ${free.map((s) => html`<option value=${s.entity_id}>${s.name} (${s.state} °C)</option>`)}
+          </select>` : nothing}
+        </div>`)}
+        <div class="bal-row">
+          <button @click=${() => this._balEdit((x) => { x.rooms[ri].zones.push({ name: 'Zone', sensors: [] }); })}>Ajouter une zone</button>
+          ${d.rooms.length > 1 ? html`<select aria-label="Regrouper ${r.name} dans une autre pièce" @change=${(e) => { const to = Number(e.target.value); if (e.target.value !== '') this._balEdit((x) => this._balMerge(x, ri, to)); }}>
+            <option value="" selected>Regrouper dans…</option>
+            ${d.rooms.map((o, oi) => (oi === ri ? nothing : html`<option value=${oi}>${o.name || 'Nouvelle pièce'}</option>`))}
+          </select>` : nothing}
+          <button @click=${() => this._balEdit((x) => { x.rooms.splice(ri, 1); })}>Supprimer la pièce</button>
+        </div>
+      </div>`)}
+      <div class="bal-row">
+        <button @click=${() => this._balEdit((x) => this._balAddRoom(x))}>Ajouter une pièce</button>
+        <label>Graduation des débitmètres (L/min)<input type="number" step="0.05" min="0.05" .value=${String(d.graduation)} @change=${(e) => this._balEdit((x) => { x.graduation = Number(e.target.value); })}></label>
+      </div>
+      <div class="bal-row">
+        <button class="primary" @click=${() => this._balSaveSetup()}>Enregistrer</button>
+        ${b.rooms.length ? html`<button @click=${() => { this._balDraft = null; }}>Annuler</button>` : nothing}
+      </div>
+    </section>`;
+  }
+
+  _renderBalThermostat() {
+    const b = this._bal;
+    return html`<section class="card bal">
+      <h2>Thermostat et objectif</h2>
+      <div class="bal-row">
+        <label class="grow">Pièce du thermostat<select ?disabled=${!this._admin} @change=${(e) => e.target.value && this._balCall('set_thermostat_room', { room: e.target.value })}>
+          <option value="" ?selected=${!b.thermostat_room}>Choisir…</option>
+          ${b.rooms.map((r) => html`<option value=${r.id} ?selected=${r.id === b.thermostat_room}>${r.name}</option>`)}
+        </select></label>
+      </div>
+      <div class="seg-ctl" role="group" aria-label="Objectif">
+        ${[['lower_others', 'Baisser les autres pièces'], ['raise_others', 'Monter les autres pièces']].map(([k, l]) => html`
+          <button aria-pressed=${b.objective === k} ?disabled=${!this._admin} @click=${() => this._balCall('set_objective', { objective: k })}>${l}</button>`)}
+      </div>
+      <p class="help">${b.objective === 'raise_others'
+        ? "Toutes les boucles se règlent. Réduire la pièce du thermostat allonge la chauffe : les autres pièces montent, et la consommation de gaz devrait augmenter."
+        : b.objective === 'lower_others' ? 'Les boucles de la pièce du thermostat restent grandes ouvertes ; seules les autres se règlent.'
+        : 'Choisissez ce que les réglages doivent faire : baisser les autres pièces, ou les monter.'}</p>
+    </section>`;
+  }
+
+  _renderBalReadings() {
+    const b = this._bal, fixed = b.objective === 'lower_others' ? b.thermostat_room : null;
+    const live = { heating: ['good', 'Chauffe en cours : relevé possible.'],
+      dhw: ['warning', "Eau chaude en cours : attendez la fin, le débit du plancher n'est pas représentatif."],
+      idle: ['warning', 'Pas de chauffe en ce moment : attendez la prochaine.'] }[b.activity] ?? ['info', 'État de la chaudière inconnu.'];
+    return html`<section class="card bal">
+      <h2>Relevé des débits</h2>
+      <p class="sub"><span class="dot ${live[0]}"></span>${live[1]}</p>
+      <p class="help">L'état peut avoir jusqu'à une minute de retard. Lisez chaque débitmètre pendant la chauffe, en L/min.</p>
+      ${b.rooms.flatMap((r) => r.loops.map((l) => html`<div class="bal-row">
+        <label class="grow">${r.name} · ${l.label}${r.id === fixed ? ' (grande ouverte)' : ''}
+          <input type="number" min="0" step=${b.graduation} ?disabled=${!this._admin} .value=${String(this._balReadings?.[l.label] ?? b.readings[l.label] ?? '')}
+            @change=${(e) => { this._balReadings = { ...this._balReadings, [l.label]: e.target.value }; }}>
+        </label>
+      </div>`))}
+      ${this._admin ? html`<button class="primary" @click=${() => this._balSaveReadings()}>Enregistrer le relevé</button>` : nothing}
+    </section>`;
+  }
+
+  _renderBalStart() {
+    const b = this._bal;
+    const name = (id) => b.rooms.find((r) => r.id === id)?.name ?? '';
+    return html`<section class="card bal">
+      <h2>Point de départ</h2>
+      <p class="help">Le total relevé réparti au prorata des longueurs. C'est à vous de tourner les vannes : rien n'est envoyé à la chaudière.</p>
+      <table class="bal-table">
+        <thead><tr><th>Boucle</th><th>Relevé</th><th>Conseillé</th><th>Écart</th></tr></thead>
+        <tbody>${b.start_point.map((p) => html`<tr>
+          <td>${p.label}<span class="help">${name(p.room)}</span></td>
+          <td>${fNum(p.current)}</td>
+          <td>${p.fixed ? 'grande ouverte' : fNum(p.target)}</td>
+          <td>${p.fixed ? '—' : `${p.delta > 0 ? '+' : ''}${fNum(p.delta)}`}</td>
+        </tr>`)}</tbody>
+      </table>
+      ${b.validated_at ? html`<p class="sub"><span class="dot good"></span>Validé le ${this._when(b.validated_at)}. La mesure et les recommandations arrivent dans une prochaine version.</p>`
+        : this._admin ? html`<button class="primary" @click=${() => this._balCall('validate_start_point')}>Valider ce point de départ</button>` : nothing}
+    </section>`;
+  }
+
   _renderConso() {
     const cs = this._conso;
     if (!cs) return html`<div class="card muted">Chargement…</div>`;
@@ -901,6 +1123,26 @@ class DdSmartPanel extends LitElement {
     .sub { margin: 8px 0 12px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .help { color: var(--secondary-text-color); font-size: 13px; margin: 4px 0 8px; }
     .dhw-state { margin: 4px 0; }
+    .bal { display: grid; gap: 10px; }
+    .bal h4 { margin: 8px 0 0; font-size: 14px; font-weight: 500; }
+    .bal button { font: inherit; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--divider-color); background: none; color: var(--primary-text-color); cursor: pointer; }
+    .bal button.primary { background: var(--s); border-color: var(--s); color: var(--text-primary-color, #fff); }
+    .bal > button, .bal-room > button, .bal .seg-ctl { justify-self: start; }
+    .bal .sub { flex-wrap: nowrap; }
+    .bal .seg-ctl button { border: 0; border-radius: 0; }
+    .bal input, .bal select { font: inherit; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--divider-color); background: var(--card-background-color); color: var(--primary-text-color); max-width: 100%; box-sizing: border-box; }
+    .bal label { display: grid; gap: 2px; font-size: 13px; color: var(--secondary-text-color); min-width: 0; }
+    .bal-room { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--divider-color); border-radius: 12px; }
+    .bal-zone { display: grid; gap: 8px; padding-left: 10px; border-left: 2px solid var(--divider-color); }
+    .bal-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+    .bal-row .grow { flex: 1 1 160px; }
+    .bal-name { align-self: center; overflow-wrap: anywhere; }
+    .bal-sum { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .bal-sum .help { display: block; margin: 2px 0 0; overflow-wrap: anywhere; }
+    .bal-table { width: 100%; border-collapse: collapse; }
+    .bal-table th, .bal-table td { text-align: left; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--divider-color); font-weight: 400; }
+    .bal-table th { color: var(--secondary-text-color); font-size: 13px; }
+    .bal-table .help { display: block; margin: 0; }
     .muted { color: var(--secondary-text-color); }
     .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--secondary-text-color); display: inline-block; }
     .dot.good { background: var(--success-color, #43a047); }

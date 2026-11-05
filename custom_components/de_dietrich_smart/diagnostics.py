@@ -38,4 +38,5 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: DeDietr
         "raw": anonymize(raw),
         "recent_events": rt.journal.events(20),
         "curve_diagnosis": rt.diagnostic.data.as_dict() if rt.diagnostic.data else None,
+        "balancing": rt.balancing.diagnostics(),
     }

@@ -119,6 +119,13 @@ async def test_undo_restores_before(rt, mock_client, do, restore_call, restore_a
     getattr(mock_client, restore_call).assert_awaited_once_with(*restore_args)
 
 
+async def test_undo_is_attributed_to_home_assistant(rt):
+    res = await rt.commands.set_dhw_setpoint("comfort", 50)
+    await rt.commands.undo(res.command_id)
+    # Sans cette attente, la relève suivante attribuerait le retour au thermostat ou à l'appli.
+    assert rt.coordinator._origin("h1:comfort_setpoint", 55.0) == "Home Assistant"
+
+
 async def test_boost_requires_schedule(rt, state):
     eco = copy.deepcopy(state)
     eco.dhw.mode, eco.dhw.boost_capable = "eco", True

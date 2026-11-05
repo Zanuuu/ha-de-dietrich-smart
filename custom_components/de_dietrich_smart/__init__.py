@@ -14,6 +14,7 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
 
 from . import faults, panel
+from .balancing.store import Balancing
 from .bdr.cloud import BdrClient
 from .commands import CommandRunner
 from .const import DOMAIN
@@ -50,6 +51,7 @@ class RuntimeData:
     consumption: ConsumptionCoordinator
     diagnostic: DiagnosticCoordinator
     outdoor: OutdoorCoordinator
+    balancing: Balancing
 
 
 type DeDietrichConfigEntry = ConfigEntry[RuntimeData]
@@ -91,6 +93,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -
     consumption = ConsumptionCoordinator(hass, entry, client, coordinator)
     diagnostic = DiagnosticCoordinator(hass, entry, coordinator)
     outdoor = OutdoorCoordinator(hass, entry, coordinator, consumption)
+    balancing = Balancing(hass, entry.entry_id)
+    await balancing.async_load()
     entry.runtime_data = RuntimeData(
         client=client,
         coordinator=coordinator,
@@ -100,6 +104,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -
         consumption=consumption,
         diagnostic=diagnostic,
         outdoor=outdoor,
+        balancing=balancing,
     )
     await consumption.async_load()
     # La consommation ne bloque pas le chargement : elle sera relue à l'heure suivante.
@@ -134,6 +139,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -
     async_update_issues(hass, entry)
     entry.async_on_unload(client.close)
     entry.async_on_unload(journal.async_save)
+    entry.async_on_unload(balancing.async_save)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     await panel.async_register(hass)
     return True
@@ -146,7 +152,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) 
 
 
 async def async_remove_entry(hass: HomeAssistant, entry: DeDietrichConfigEntry) -> None:
-    """Intégration supprimée : alertes et fichiers .storage (journal, consommation, températures) avec elle."""
+    """Intégration supprimée : alertes et fichiers .storage (journal, conso, températures, nourrice) avec elle."""
     async_delete_issues(hass, entry.entry_id)
-    for name in ("journal", "consumption", "outdoor"):
+    for name in ("journal", "consumption", "outdoor", "balancing"):
         await Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.{name}").async_remove()

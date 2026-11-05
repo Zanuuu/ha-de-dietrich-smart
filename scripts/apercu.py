@@ -34,13 +34,16 @@ with sync_playwright() as pw:
             page.on("pageerror", lambda e: problems.append(f"page: {e}"))
             page.goto(f"{BASE}?theme={theme}")
             page.wait_for_selector("dd-smart-panel >> .week")
-            for tab in ("programs", "curve", "conso", "journal"):
+            for tab in ("programs", "curve", "conso", "balancing", "journal"):
                 if tab == "conso":
                     page.locator("dd-smart-panel >> nav button", has_text="Consommation").click()
                     page.wait_for_selector("dd-smart-panel >> .tiles")
                 if tab == "curve":
                     page.locator("dd-smart-panel >> nav button", has_text="Courbe").click()
                     page.wait_for_selector("dd-smart-panel >> .chart svg polyline.prop")
+                if tab == "balancing":
+                    page.locator("dd-smart-panel >> nav button", has_text="Nourrice").click()
+                    page.wait_for_selector("dd-smart-panel >> .bal-table")
                 if tab == "journal":
                     page.locator("dd-smart-panel >> nav button", has_text="Journal").click()
                     page.wait_for_selector("dd-smart-panel >> .journal li")
@@ -79,6 +82,23 @@ with sync_playwright() as pw:
     if d.suggested_filename != "de-dietrich-conso-jours-2026-11-04.csv" or not content.startswith(b"\xef\xbb\xbfJour;"):
         problems.append(f"export CSV : {d.suggested_filename} {content[:20]!r}")
     page.close()
+    # Nourrice sans inventaire : proposition à revoir.
+    for width, height, size in ((390, 844, "mobile"), (1440, 960, "bureau")):
+        page = browser.new_page(viewport={"width": width, "height": height}, device_scale_factor=1, locale="fr-FR")
+        page.on("console", lambda m: m.type == "error" and problems.append(f"console: {m.text}"))
+        page.on("pageerror", lambda e: problems.append(f"page: {e}"))
+        page.goto(f"{BASE}?case=balancing-new")
+        page.wait_for_selector("dd-smart-panel >> .week")
+        page.locator("dd-smart-panel >> nav button", has_text="Nourrice").click()
+        page.wait_for_selector("dd-smart-panel >> .bal-room")
+        page.screenshot(path=f"{OUT}/balancing-setup-{size}.png", full_page=True)
+        if over := page.evaluate(OVERFLOW):
+            problems.append(f"débordement nourrice {size}: {over}")
+        # Regrouper deux pièces : zones et boucles passent dans la pièce restante.
+        page.locator('dd-smart-panel >> select[aria-label^="Regrouper"]').first.select_option(index=1)
+        if page.locator("dd-smart-panel >> .bal-room").count() != 1 or page.locator("dd-smart-panel >> .bal-zone").count() != 2:
+            problems.append(f"regroupement nourrice {size}")
+        page.close()
     # Courbe dangereuse pour le plancher : alerte et bascule proposée, puis confirmation.
     for width, height, size in ((390, 844, "mobile"), (1440, 960, "bureau")):
         page = browser.new_page(viewport={"width": width, "height": height}, device_scale_factor=1, locale="fr-FR")

@@ -6,7 +6,7 @@ from __future__ import annotations
 import logging
 import time
 from collections import Counter
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 from datetime import date, timedelta
 from typing import TYPE_CHECKING, Any
 
@@ -17,6 +17,9 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.util import dt as dt_util
 
+from .balancing import sources as balancing_sources
+from .balancing.model import OBJECTIVE_LOWER, OBJECTIVES, BalancingError
+from .balancing.proposal import propose
 from .commands import CommandError, CommandResult
 from .const import (
     CONF_BASE_TEMP,
@@ -33,6 +36,7 @@ from .curve import curve_flow, floor_violation, guard_active
 from .curve.dju import DJU_BASE, csv_days, csv_hours, monthly, rows_provider, summary
 from .curve.history import fetch_hours, resolve_entity_ids
 from .curve.simulator import daily_summary, forecast_points, simulate
+from .events import event
 
 if TYPE_CHECKING:
     from . import DeDietrichConfigEntry
@@ -365,6 +369,152 @@ def ws_consumption_csv(hass: HomeAssistant, connection: websocket_api.ActiveConn
     connection.send_result(msg["id"], {"filename": f"de-dietrich-conso-{label}-{today.isoformat()}.csv", "csv": text})
 
 
+SENSOR_SCHEMA = probatio.Schema(
+    {
+        probatio.Required("entity_id"): str,
+        probatio.Optional("correction", default=0.0): probatio.Coerce(float),
+    }
+)
+ROOM_SCHEMA = probatio.Schema(
+    {
+        probatio.Required("id"): str,
+        probatio.Required("name"): str,
+        probatio.Required("target"): probatio.Coerce(float),
+        probatio.Optional("climate", default=None): probatio.Any(None, str),
+        probatio.Required("zones"): [{probatio.Required("name"): str, probatio.Required("sensors"): [SENSOR_SCHEMA]}],
+        probatio.Required("loops"): [
+            {probatio.Required("label"): str, probatio.Required("length"): probatio.Coerce(float)}
+        ],
+    }
+)
+
+
+def _balancing_status(hass: HomeAssistant, entry: DeDietrichConfigEntry) -> dict[str, Any]:
+    appliance = entry.runtime_data.coordinator.data.appliance
+    return {
+        **entry.runtime_data.balancing.status(),
+        "activity": appliance.activity if appliance else None,
+        "sensors": balancing_sources.sensors(hass),
+        "climates": balancing_sources.climates(hass),
+    }
+
+
+def _balancing_write(
+    hass: HomeAssistant,
+    connection: websocket_api.ActiveConnection,
+    msg: dict,
+    write: Callable[[DeDietrichConfigEntry], None],
+) -> None:
+    """Applique une saisie : le refus s'affiche tel quel, la réponse donne le nouvel état."""
+    if not (entry := _entry(hass, connection, msg)):
+        return
+    try:
+        write(entry)
+    except BalancingError as exc:
+        connection.send_error(msg["id"], "invalid_input", str(exc))
+        return
+    connection.send_result(msg["id"], _balancing_status(hass, entry))
+
+
+@websocket_api.websocket_command(
+    {probatio.Required("type"): f"{T}/balancing/status", probatio.Required("entry_id"): str}
+)
+@callback
+def ws_balancing_status(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    if entry := _entry(hass, connection, msg):
+        connection.send_result(msg["id"], _balancing_status(hass, entry))
+
+
+@websocket_api.websocket_command(
+    {probatio.Required("type"): f"{T}/balancing/propose", probatio.Required("entry_id"): str}
+)
+@callback
+def ws_balancing_propose(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Brouillon tiré des zones de HA ; rien n'est enregistré."""
+    if _entry(hass, connection, msg):
+        connection.send_result(
+            msg["id"],
+            propose(balancing_sources.sensors(hass), balancing_sources.climates(hass), balancing_sources.areas(hass)),
+        )
+
+
+@websocket_api.websocket_command(
+    {
+        probatio.Required("type"): f"{T}/balancing/save_setup",
+        probatio.Required("entry_id"): str,
+        probatio.Required("rooms"): [ROOM_SCHEMA],
+        probatio.Required("graduation"): probatio.Coerce(float),
+    }
+)
+@websocket_api.require_admin
+@callback
+def ws_balancing_save_setup(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    _balancing_write(
+        hass, connection, msg, lambda e: e.runtime_data.balancing.save_setup(msg["rooms"], msg["graduation"])
+    )
+
+
+@websocket_api.websocket_command(
+    {
+        probatio.Required("type"): f"{T}/balancing/save_readings",
+        probatio.Required("entry_id"): str,
+        probatio.Required("readings"): {str: probatio.Coerce(float)},
+    }
+)
+@websocket_api.require_admin
+@callback
+def ws_balancing_save_readings(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    _balancing_write(hass, connection, msg, lambda e: e.runtime_data.balancing.save_readings(msg["readings"]))
+
+
+@websocket_api.websocket_command(
+    {
+        probatio.Required("type"): f"{T}/balancing/set_thermostat_room",
+        probatio.Required("entry_id"): str,
+        probatio.Required("room"): str,
+    }
+)
+@websocket_api.require_admin
+@callback
+def ws_balancing_set_thermostat_room(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    _balancing_write(hass, connection, msg, lambda e: e.runtime_data.balancing.set_thermostat_room(msg["room"]))
+
+
+@websocket_api.websocket_command(
+    {
+        probatio.Required("type"): f"{T}/balancing/set_objective",
+        probatio.Required("entry_id"): str,
+        probatio.Required("objective"): probatio.In(OBJECTIVES),
+    }
+)
+@websocket_api.require_admin
+@callback
+def ws_balancing_set_objective(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    def write(entry: DeDietrichConfigEntry) -> None:
+        if entry.runtime_data.balancing.set_objective(msg["objective"]):
+            text = "baisser les autres pièces" if msg["objective"] == OBJECTIVE_LOWER else "monter les autres pièces"
+            entry.runtime_data.journal.add_event(event("nourrice", f"Nourrice : objectif {text}"))
+
+    _balancing_write(hass, connection, msg, write)
+
+
+@websocket_api.websocket_command(
+    {probatio.Required("type"): f"{T}/balancing/validate_start_point", probatio.Required("entry_id"): str}
+)
+@websocket_api.require_admin
+@callback
+def ws_balancing_validate_start_point(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict
+) -> None:
+    def write(entry: DeDietrichConfigEntry) -> None:
+        entry.runtime_data.balancing.validate_start_point()
+        entry.runtime_data.journal.add_event(event("nourrice", "Nourrice : point de départ validé"))
+
+    _balancing_write(hass, connection, msg, write)
+
+
 @callback
 def async_setup_websocket(hass: HomeAssistant) -> None:
     for handler in (
@@ -379,5 +529,12 @@ def async_setup_websocket(hass: HomeAssistant) -> None:
         ws_consumption,
         ws_consumption_csv,
         ws_undo,
+        ws_balancing_status,
+        ws_balancing_propose,
+        ws_balancing_save_setup,
+        ws_balancing_save_readings,
+        ws_balancing_set_thermostat_room,
+        ws_balancing_set_objective,
+        ws_balancing_validate_start_point,
     ):
         websocket_api.async_register_command(hass, handler)
