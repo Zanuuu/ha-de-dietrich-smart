@@ -96,7 +96,10 @@ with sync_playwright() as pw:
             problems.append(f"débordement nourrice {size}: {over}")
         # Regrouper deux pièces : zones et boucles passent dans la pièce restante.
         page.locator('dd-smart-panel >> select[aria-label^="Regrouper"]').first.select_option(index=1)
-        if page.locator("dd-smart-panel >> .bal-room").count() != 1 or page.locator("dd-smart-panel >> .bal-zone").count() != 2:
+        if (
+            page.locator("dd-smart-panel >> .bal-room").count() != 1
+            or page.locator("dd-smart-panel >> .bal-zone").count() != 2
+        ):
             problems.append(f"regroupement nourrice {size}")
         page.close()
     # Courbe dangereuse pour le plancher : alerte et bascule proposée, puis confirmation.
