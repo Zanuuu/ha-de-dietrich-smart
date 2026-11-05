@@ -52,6 +52,12 @@ Remeha Home apps.
   curve that is already unsafe can still be moved step by step toward safety. Undo restores the
   previous curve as it was. Set the emitters to radiators, or the connection to mixing valve, to
   lift the guard.
+- **Manifold assistant** (manifold tab): rooms and temperature sensors proposed from Home Assistant
+  areas and fully editable (a room can have several zones and heating loops, each sensor a
+  correction), thermostat room, objective (lower or raise the other rooms), flow readings taken while
+  the boiler heats the floor, and a starting point that shares the total flow by loop length. It only
+  advises: you turn the valves, nothing is sent to the boiler. Measurements and recommendations come
+  in a later version.
 - **Services**: `set_override`, `set_holiday`, `cancel_holiday`, `set_week_program`,
   `undo_last_command`.
 - **Repairs**: cloud unreachable, low water pressure, boiler fault, and a heating curve unsafe
