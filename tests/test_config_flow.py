@@ -11,7 +11,7 @@ from custom_components.de_dietrich_smart.bdr.cloud import BdrClient
 from custom_components.de_dietrich_smart.bdr.models import AuthError, SourceError
 from custom_components.de_dietrich_smart.const import DOMAIN
 
-CREDS = {"username": "julie@example.org", "password": "mot-de-passe"}
+CREDS = {"username": "test@example.org", "password": "mot-de-passe"}
 
 
 @pytest.fixture
@@ -70,7 +70,7 @@ async def test_reauth(hass, flow_client, config_entry):
     flow_client.fetch_state.side_effect = None
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"password": "nouveau"})
     assert result["type"] is FlowResultType.ABORT and result["reason"] == "reauth_successful"
-    assert config_entry.data == {"username": "julie@example.org", "password": "nouveau"}
+    assert config_entry.data == {"username": "test@example.org", "password": "nouveau"}
 
 
 async def test_reconfigure_other_device_aborts(hass, flow_client, config_entry, state):
@@ -88,7 +88,7 @@ async def test_reconfigure_other_device_aborts(hass, flow_client, config_entry, 
 async def test_reconfigure_same_device(hass, flow_client, config_entry):
     result = await config_entry.start_reconfigure_flow(hass)
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"username": "julie@example.org", "password": "neuf"}
+        result["flow_id"], {"username": "test@example.org", "password": "neuf"}
     )
     assert result["type"] is FlowResultType.ABORT and result["reason"] == "reconfigure_successful"
     assert config_entry.data["password"] == "neuf"

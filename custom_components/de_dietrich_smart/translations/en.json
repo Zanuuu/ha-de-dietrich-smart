@@ -54,7 +54,7 @@
           "default_duration": "Used when the temperature is changed from Home Assistant.",
           "connection": "Direct: the boiler heating curve sets the water temperature of the floor.",
           "max_floor_flow": "Above it, at the design outdoor temperature, a repair warns that the heating curve is unsafe for the floor.",
-          "base_temp": "Coldest outdoor temperature the installation is designed for (about -15 °C in la ville).",
+          "base_temp": "Coldest outdoor temperature the installation is designed for (-15 °C by default).",
           "weather_entity": "Used by the heating curve simulator.",
           "gas_price": "Fixed price per kWh. When set, cost statistics are imported for the Energy dashboard (\"Use an entity tracking the total costs\"); the whole history is computed at this price."
         }

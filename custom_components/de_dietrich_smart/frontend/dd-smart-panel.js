@@ -1,6 +1,5 @@
 // Panneau « Chaudière » de l'intégration De Dietrich Smart : programmes horaires, courbe de chauffe,
 // consommation et journal.
-// Repris de l'interface de l'application ancienne application (mêmes règles et mêmes textes).
 // Aucune ressource externe : Lit est servi par l'intégration.
 import { LitElement, html, svg, css, nothing } from './lit-all.min.js';
 

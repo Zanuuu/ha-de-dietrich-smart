@@ -95,7 +95,7 @@ def _ts(value: Any) -> datetime | None:
 
 def _ts_local(value: Any, tz: ZoneInfo) -> datetime | None:
     """Heure de changement du programme : le cloud donne l'heure locale suivie d'un « Z »
-    trompeur (« 22:00:00Z » pour un changement à 22:00 à la ville, en hiver comme en été)."""
+    trompeur (« 22:00:00Z » pour un changement à 22:00, en hiver comme en été)."""
     dt = _ts(value)
     return dt.replace(tzinfo=tz) if dt else None
 

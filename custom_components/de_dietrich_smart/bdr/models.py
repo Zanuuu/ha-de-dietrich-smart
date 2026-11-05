@@ -1,4 +1,4 @@
-"""Modèle de données de la chaudière (porté de l'application ancienne application).
+"""Modèle de données de la chaudière.
 
 Un champ que le cloud ne fournit pas vaut None.
 """

@@ -99,10 +99,9 @@ Requires Home Assistant 2026.10 or later.
   the cold band, it reports "not enough data". It judges on the thermostat only; room sensors
   come with the manifold assistant.
 
-## Migration from the former application
+## Releases
 
-The integration replaces the `ancienne application` application of the projet. See
-[docs/bascule.md](docs/bascule.md) (French). Releases: [docs/version.md](docs/version.md) (French).
+See [docs/version.md](docs/version.md) (French).
 
 ## License
 

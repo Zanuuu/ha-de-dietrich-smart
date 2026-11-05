@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
-# Lint et tests dans un conteneur jetable sur hote-docker : le poste n'a ni pip ni Python 3.14.
+# Lint et tests dans un conteneur jetable sur un hôte Docker, sans rien installer sur le poste.
 # Usage : scripts/ci.sh lint|test|all|fix [arguments pytest]
 # L'image de test est construite une fois par contenu de requirements_test.txt.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-HOST="${CI_HOST:-ops@hote-docker}"
+# Hôte Docker : CI_HOST dans l'environnement ou dans scripts/local.conf (ignoré par Git).
+[[ -f scripts/local.conf ]] && source scripts/local.conf
+HOST="${CI_HOST:?définir CI_HOST (hôte Docker en SSH), par exemple dans scripts/local.conf}"
 MODE="${1:-all}"; shift || true
+[[ "$MODE" == fix ]] || scripts/verif-public.sh
 TAG="dd-smart-test:$(sha256sum requirements_test.txt | cut -c1-12)"
 
 if ! ssh -o BatchMode=yes "$HOST" docker image inspect "$TAG" >/dev/null 2>&1; then
