@@ -207,7 +207,7 @@ async def test_cost_statistics_imported_with_price(hass, mock_client, freezer) -
     entry = MockConfigEntry(
         domain="de_dietrich_smart",
         unique_id="a1b2c3",
-        data={"username": "julie@example.org", "password": "mot-de-passe"},
+        data={"username": "test@example.org", "password": "mot-de-passe"},
         options={"gas_price": 0.15},
     )
     entry.add_to_hass(hass)

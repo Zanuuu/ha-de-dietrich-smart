@@ -1,6 +1,5 @@
 """Commandes : exécution, journal, annulation et retours au programme différés.
 
-Port de `controller.py` de l'application ancienne application : mêmes contrôles et messages.
 Chaque commande garde l'état d'avant, ce qui permet « Annuler » pendant 2 min. Les
 dérogations d'une durée fixe (1 h, 2 h) passent la zone en manuel puis la remettent au
 programme à l'échéance, si personne n'a changé le réglage entre-temps.

@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Captures du panneau dans un conteneur Playwright sur hote-docker ; les PNG arrivent dans $1.
+# Captures du panneau dans un conteneur Playwright sur un hôte Docker ; les PNG arrivent dans $1.
 set -euo pipefail
 cd "$(dirname "$0")/.."
-HOST="${CI_HOST:-ops@hote-docker}"
+# Hôte Docker : CI_HOST dans l'environnement ou dans scripts/local.conf (ignoré par Git).
+[[ -f scripts/local.conf ]] && source scripts/local.conf
+HOST="${CI_HOST:?définir CI_HOST (hôte Docker en SSH), par exemple dans scripts/local.conf}"
 OUT="${1:?usage: scripts/apercu.sh <dossier de sortie>}"
 mkdir -p "$OUT"
 IMAGE="mcr.microsoft.com/playwright/python:v1.55.0-noble"

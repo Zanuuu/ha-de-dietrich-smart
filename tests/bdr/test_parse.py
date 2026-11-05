@@ -58,8 +58,8 @@ def test_unknown_values_are_none(dashboard):
 
 
 def test_anonymize_keeps_structure(dashboard):
-    dashboard["appliances"][0]["ownerEmail"] = "julie@example.org"
-    dashboard["appliances"][0]["note"] = "contact julie@example.org"
+    dashboard["appliances"][0]["ownerEmail"] = "test@example.org"
+    dashboard["appliances"][0]["note"] = "contact test@example.org"
     out = anonymize(dashboard)
     a = out["appliances"][0]
     assert a["applianceId"].startswith("<masqué:")

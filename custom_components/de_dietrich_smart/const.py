@@ -1,4 +1,4 @@
-"""Constantes de l'intégration (valeurs reprises de l'application ancienne application)."""
+"""Constantes de l'intégration."""
 
 from datetime import timedelta
 from typing import Final
@@ -20,7 +20,7 @@ DURATION_CHOICES: Final = ("next", "1h", "2h", "permanent")
 HOLIDAY_MAX_DAYS: Final = 365
 # Pression basse : en dessous, ou si la chaudière la signale.
 LOW_PRESSURE: Final = 1.0
-# Plancher chauffant : départ maxi admissible et température extérieure de base (la ville).
+# Plancher chauffant : départ maxi admissible et température extérieure de base.
 DEFAULT_MAX_FLOOR_FLOW: Final = 45.0
 DEFAULT_BASE_TEMP: Final = -15.0
 # Bornes d'une courbe de plancher (pente, pied en °C), en plus du départ maxi admissible.

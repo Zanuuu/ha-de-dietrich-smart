@@ -1,7 +1,5 @@
 """Programmes horaires du thermostat : changements de consigne par jour et activités.
 
-Porté de l'application ancienne application.
-
 Format commun (celui du cloud BDR Thermea, normalisé) : une liste de changements
 {"day": 0-6, "time": "HH:MM", "activity": n, "setpoint": float | None}. Jour 0 =
 dimanche, 1 = lundi … 6 = samedi. `setpoint` n'est renseigné que si le changement porte

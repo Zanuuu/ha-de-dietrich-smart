@@ -12,7 +12,7 @@ async def test_diagnostics_redacted(hass, config_entry, mock_client, dashboard):
     await hass.async_block_till_done()
     diag = await async_get_config_entry_diagnostics(hass, config_entry)
     text = json.dumps(diag, default=str)
-    assert "julie@example.org" not in text and "mot-de-passe" not in text
+    assert "test@example.org" not in text and "mot-de-passe" not in text
     assert diag["entry"]["data"] == {"username": "**REDACTED**", "password": "**REDACTED**"}
     # Identifiants d'appareil remplacés par des pseudonymes.
     assert "a1b2c3" not in text and not re.search(r'"(z1|h1)"', text)

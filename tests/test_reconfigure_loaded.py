@@ -32,7 +32,7 @@ async def test_reconfigure_unloads_during_validation(hass, config_entry, mock_cl
     await hass.async_block_till_done()
     result = await config_entry.start_reconfigure_flow(hass)
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"username": "julie@example.org", "password": "neuf"}
+        result["flow_id"], {"username": "test@example.org", "password": "neuf"}
     )
     await hass.async_block_till_done()
     assert result["type"] is FlowResultType.ABORT and result["reason"] == "reconfigure_successful"
@@ -52,7 +52,7 @@ async def test_failed_validation_reloads_entry(hass, config_entry, mock_client, 
     await hass.async_block_till_done()
     result = await config_entry.start_reconfigure_flow(hass)
     result = await hass.config_entries.flow.async_configure(
-        result["flow_id"], {"username": "julie@example.org", "password": "neuf"}
+        result["flow_id"], {"username": "test@example.org", "password": "neuf"}
     )
     await hass.async_block_till_done()
     assert result["errors"] == {"base": "cannot_connect"}

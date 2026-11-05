@@ -33,7 +33,7 @@ def mock_login(router, ok=True, token="tok-1"):
 
 @pytest.fixture
 def src():
-    return b.BdrClient("julie@example.org", "mot-de-passe", TZ)
+    return b.BdrClient("test@example.org", "mot-de-passe", TZ)
 
 
 @respx.mock
@@ -52,7 +52,7 @@ async def test_login_and_dashboard(src, dashboard):
     # Formulaire B2C : identifiants et jeton CSRF attendus.
     form = respx.calls[1].request
     assert form.headers["x-csrf-token"] == "csrf-1"
-    assert b"signInName=julie%40example.org" in form.content
+    assert b"signInName=test%40example.org" in form.content
     assert form.url.params["tx"].startswith("StateProperties=")
     # Échange du code avec le vérificateur PKCE.
     body = token.calls[0].request.content.decode()
@@ -386,7 +386,7 @@ async def test_client_factory_used(dashboard):
         made.append(kw)
         return httpx.AsyncClient(**kw)
 
-    src = b.BdrClient("julie@example.org", "mot-de-passe", TZ, client_factory=factory)
+    src = b.BdrClient("test@example.org", "mot-de-passe", TZ, client_factory=factory)
     await src.start()
     await src.fetch_state()
     await src.close()
@@ -439,7 +439,7 @@ async def test_user_agent_given_by_caller(dashboard):
     mock_login(respx)
     respx.get(f"{b.API}/homes/dashboard").mock(return_value=httpx.Response(200, json=dashboard))
     respx.get(url__regex=rf"{b.API}/.*").mock(return_value=httpx.Response(404))
-    src = b.BdrClient("julie@example.org", "mot-de-passe", TZ, user_agent="ha-de-dietrich-smart/9.9.9")
+    src = b.BdrClient("test@example.org", "mot-de-passe", TZ, user_agent="ha-de-dietrich-smart/9.9.9")
     await src.start()
     await src.fetch_state()
     await src.close()

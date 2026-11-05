@@ -1,7 +1,4 @@
-"""Événements du journal, tirés de la comparaison de deux relèves.
-
-Port de `poller._diff` de l'application ancienne application : mêmes types, niveaux et textes.
-"""
+"""Événements du journal, tirés de la comparaison de deux relèves."""
 
 from __future__ import annotations
 

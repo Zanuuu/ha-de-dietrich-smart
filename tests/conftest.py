@@ -69,7 +69,7 @@ def config_entry(hass):
         domain="de_dietrich_smart",
         title="EMC-S",
         unique_id="a1b2c3",
-        data={"username": "julie@example.org", "password": "mot-de-passe"},
+        data={"username": "test@example.org", "password": "mot-de-passe"},
     )
     entry.add_to_hass(hass)
     return entry

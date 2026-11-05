@@ -1,7 +1,6 @@
 """Captures du panneau (banc tests/frontend/harness.html) pour contrôle visuel.
 
-Lancé par scripts/apercu.sh dans un conteneur Playwright sur hote-docker (le poste
-n'a pas de navigateur). Écrit /w/out/*.png ; signale les erreurs de console et les
+Lancé par scripts/apercu.sh dans un conteneur Playwright. Écrit /w/out/*.png ; signale les erreurs de console et les
 débordements horizontaux, et sort en erreur s'il y en a.
 """
 
