@@ -14,7 +14,8 @@ from .entity import DeDietrichEntity
 
 PARALLEL_UPDATES = 1
 OPERATIONS = ["schedule", "comfort", "eco"]
-# Le boost se déroule dans le programme ; l'arrêt complet n'est pas proposé (hors-gel = éco).
+# Le boost se déroule dans le programme. L'arrêt complet n'est pas proposé : en éco, la chaudière
+# produit encore l'eau chaude demandée.
 READ_AS = {"boost": "schedule", "off": "eco"}
 
 
@@ -44,6 +45,7 @@ class DhwWaterHeater(DeDietrichEntity, WaterHeaterEntity):
 
     @property
     def native_current_temperature(self) -> float | None:
+        # Chaudière instantanée (« Combi ») : le cloud ne transmet aucune température d'eau, None est normal.
         return self.dhw.temp if self.dhw else None
 
     @property
@@ -52,6 +54,11 @@ class DhwWaterHeater(DeDietrichEntity, WaterHeaterEntity):
 
     current_temperature = native_current_temperature
     target_temperature = native_target_temperature
+
+    @property
+    def extra_state_attributes(self) -> dict[str, float | None]:
+        """Consigne annoncée par le cloud : elle peut différer de la consigne confort réglée ici."""
+        return {"active_setpoint": self.dhw.target if self.dhw else None}
 
     @property
     def min_temp(self) -> float:

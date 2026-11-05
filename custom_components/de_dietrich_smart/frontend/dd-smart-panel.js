@@ -10,7 +10,7 @@ const DAYS_S = ['Dim.', 'Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.'];
 const WEEK_ORDER = [1, 2, 3, 4, 5, 6, 0];
 const MAX_PER_DAY = 6;
 const MODE = { schedule: 'programme', override: 'dérogation', manual: 'manuel', antifrost: 'hors-gel' };
-const DHW_MODE = { schedule: 'programme', comfort: 'confort permanent', eco: 'éco (hors-gel)', boost: 'boost', off: 'arrêt' };
+const DHW_MODE = { schedule: 'programme', comfort: 'confort permanent', eco: 'éco', boost: 'boost', off: 'arrêt' };
 const KINDS = [['', 'Tout'], ['defaut', 'Défauts'], ['pression', 'Pression'], ['mode', 'Modes'], ['consigne', 'Consignes'],
   ['ecs', 'Eau chaude'], ['connexion', 'Connexion'], ['reglage', 'Réglages'], ['programme', 'Programmes']];
 const ACTION = { consigne: 'Consigne', mode: 'Mode', programme: 'Programme', cheminee: 'Mode cheminée', ecs_mode: 'Mode eau chaude',
@@ -477,16 +477,22 @@ class DdSmartPanel extends LitElement {
             })}
           </ul>
         </section>` : nothing}
-      ${d?.week?.length ? html`
+      ${d ? html`
         <section class="card">
           <h2>Eau chaude</h2>
-          <p class="help">${d.mode === 'schedule' || d.mode === 'boost'
+          <p class="dhw-state">
+            Mode ${DHW_MODE[d.mode] ?? d.mode ?? '—'} · confort ${fDeg(d.comfort_setpoint)}
+            · consigne active ${fDeg(d.target)} · ${d.status === 'heating' ? 'en chauffe' : 'au repos'}
+          </p>
+          ${d.temp == null ? html`<p class="help">Chaudière instantanée : le cloud ne transmet pas la température de l'eau.</p>`
+            : html`<p class="help">Température de l'eau : ${fDeg(d.temp)}.</p>`}
+          ${d.week?.length ? html`<p class="help">${d.mode === 'schedule' || d.mode === 'boost'
             ? `Confort (${fDeg(d.comfort_setpoint)}) aux heures colorées, température réduite (${fDeg(d.reduced_setpoint)}) ailleurs.`
             : `Suivi en mode programme seulement (actuellement : ${DHW_MODE[d.mode] ?? d.mode ?? '—'}). Confort aux heures colorées, réduit ailleurs.`}</p>
           <div class="week" role="list">
             ${WEEK_ORDER.map((day) => this._dhwRow(day, daySegments(d.week, day)))}
           </div>
-          <div class="scale" aria-hidden="true"><span>0 h</span><span>6 h</span><span>12 h</span><span>18 h</span><span>24 h</span></div>
+          <div class="scale" aria-hidden="true"><span>0 h</span><span>6 h</span><span>12 h</span><span>18 h</span><span>24 h</span></div>` : nothing}
         </section>` : nothing}
     `;
   }
@@ -894,6 +900,7 @@ class DdSmartPanel extends LitElement {
     .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
     .sub { margin: 8px 0 12px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
     .help { color: var(--secondary-text-color); font-size: 13px; margin: 4px 0 8px; }
+    .dhw-state { margin: 4px 0; }
     .muted { color: var(--secondary-text-color); }
     .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; background: var(--secondary-text-color); display: inline-block; }
     .dot.good { background: var(--success-color, #43a047); }

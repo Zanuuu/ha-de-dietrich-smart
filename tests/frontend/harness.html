@@ -33,7 +33,7 @@
     state: { appliances: [{ id: 'a1', name: 'EMC-S 24/28 MI',
       zones: [{ id: 'z1', name: 'Séjour', program: 2, programs: [1, 2, 3], mode: 'schedule', setpoint: 19, room_temp: 19.5,
         week: { 1: p1, 2: p2, 3: [] }, activities }],
-      dhw: [{ id: 'h1', name: 'Eau chaude', mode: 'eco', comfort_setpoint: 50, reduced_setpoint: 15, week: dhwWeek }] }] } }] };
+      dhw: [{ id: 'h1', name: 'Eau chaude', mode: 'eco', comfort_setpoint: 50, reduced_setpoint: 15, target: 45, temp: null, status: 'idle', dhw_type: 'Combi', week: dhwWeek }] }] } }] };
   const ev = (m, kind, level, ago, origin) => ({ id: Math.round(ago), ts: now - ago, kind, level, message: m, data: origin ? { origin } : {} });
   const journal = {
     events: [ev('Consigne : 19 °C → 19,5 °C', 'consigne', 'info', 300, 'Home Assistant'),

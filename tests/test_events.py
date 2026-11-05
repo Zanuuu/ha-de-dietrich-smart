@@ -92,7 +92,7 @@ def test_dhw_mode_and_setpoint(state):
         s.dhw.mode, s.dhw.comfort_setpoint = "eco", 50.0
 
     assert messages(diff(state, changed(state, dhw), ext)) == [
-        "Eau chaude : Programme → Éco (hors-gel)",
+        "Eau chaude : Programme → Éco",
         "Consigne eau chaude confort : 55 °C → 50 °C",
     ]
 
