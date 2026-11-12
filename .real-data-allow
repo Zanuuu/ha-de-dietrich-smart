@@ -1,0 +1,10 @@
+# Exceptions au contrôle real-data : services publics que ce dépôt cite ou appelle.
+# Une valeur par ligne, sa raison en commentaire. Un domaine couvre ses sous-domaines.
+github.com         # dépôt public de l'intégration, licence de Lit, adresses noreply des auteurs
+anthropic.com      # adresse de co-auteur dans les messages de commit
+bdrthermea.net     # API du fabricant, appelée par l'intégration
+onmicrosoft.com    # fournisseur d'identité du fabricant (Azure AD B2C)
+open-meteo.com     # API météo publique, appelée par l'intégration
+lit.dev            # documentation de la bibliothèque Lit
+semver.org         # référence de la numérotation des versions
+mcr.microsoft.com  # image Playwright du script d'aperçu

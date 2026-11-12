@@ -8,7 +8,6 @@ cd "$(dirname "$0")/.."
 [[ -f scripts/local.conf ]] && source scripts/local.conf
 HOST="${CI_HOST:?définir CI_HOST (hôte Docker en SSH), par exemple dans scripts/local.conf}"
 MODE="${1:-all}"; shift || true
-[[ "$MODE" == fix ]] || scripts/verif-public.sh
 TAG="dd-smart-test:$(sha256sum requirements_test.txt | cut -c1-12)"
 
 if ! ssh -o BatchMode=yes "$HOST" docker image inspect "$TAG" >/dev/null 2>&1; then

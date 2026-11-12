@@ -1,19 +1,12 @@
-# Même contrôle que scripts/ci.sh, sur un runner GitLab.
-image: python:3.14-slim
-
-stages: [check]
-
-before_script:
-  - pip install --root-user-action=ignore --no-cache-dir -r requirements_test.txt
-
-lint:
-  stage: check
-  script:
-    - ruff check .
-    - ruff format --check .
-    - mypy custom_components
-
-test:
-  stage: check
-  script:
-    - python -m pytest -q -p no:cacheprovider
+# Pipeline par composants (ci-components) : inclusions et entrées seulement.
+# Ce dépôt est publié : real-data n'y admet que les valeurs réservées à la documentation et
+# les services publics déclarés dans .real-data-allow.
+include:
+  - component: $CI_SERVER_FQDN/$CI_PROJECT_ROOT_NAMESPACE/platform/ci-components/workflow@1
+  - component: $CI_SERVER_FQDN/$CI_PROJECT_ROOT_NAMESPACE/platform/ci-components/secrets@1
+  - component: $CI_SERVER_FQDN/$CI_PROJECT_ROOT_NAMESPACE/platform/ci-components/real-data@1
+  - component: $CI_SERVER_FQDN/$CI_PROJECT_ROOT_NAMESPACE/platform/ci-components/mr-title@1
+  - component: $CI_SERVER_FQDN/$CI_PROJECT_ROOT_NAMESPACE/platform/ci-components/python@1
+    inputs:
+      mypy_target: custom_components
+  - component: $CI_SERVER_FQDN/$CI_PROJECT_ROOT_NAMESPACE/platform/ci-components/release@1

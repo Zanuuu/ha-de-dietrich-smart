@@ -52,7 +52,9 @@ CLIENT_ID = "6ce007c6-0628-419e-88f4-bee2e6418eec"
 REDIRECT_URI = "com.b2c.remehaapp://login-callback"
 SCOPE = "openid https://bdrb2cprod.onmicrosoft.com/iotdevice/user_impersonation offline_access"
 API = "https://api.bdrthermea.net/Mobile/api"
-SUBSCRIPTION_KEY = "df605c5470d846fc91e848b1cc653ddf"
+# Clé d'abonnement de l'application mobile du fabricant : publique, identique pour tous les
+# utilisateurs, ce n'est pas un secret de ce dépôt. Signalée à tort par le détecteur de secrets.
+SUBSCRIPTION_KEY = "df605c5470d846fc91e848b1cc653ddf"  # gitleaks:allow
 USER_AGENT = "ha-de-dietrich-smart"
 
 ZONE_MODE = {
