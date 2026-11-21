@@ -18,7 +18,7 @@ jobs:
           test "v$v" = "${GITHUB_REF_NAME}" || { echo "manifest $v ≠ tag ${GITHUB_REF_NAME}"; exit 1; }
       - name: Zip the integration
         run: cd custom_components/de_dietrich_smart && zip -r "$GITHUB_WORKSPACE/de_dietrich_smart.zip" . -x "__pycache__/*"
-      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+      - uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3
         with:
           files: de_dietrich_smart.zip
           generate_release_notes: true
